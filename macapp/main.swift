@@ -6,11 +6,25 @@ import WebKit
 final class OneFinder: NSObject, NetServiceBrowserDelegate, NetServiceDelegate {
     let browser = NetServiceBrowser()
     var services: [NetService] = []
+    var names: [String: String] = [:]      // by address: what each One calls itself. It can be renamed at any time
     var changed: ([[String: String]]) -> Void = { _ in }
 
     func start() {
         browser.delegate = self
         browser.searchForServices(ofType: "_downstage._tcp.", inDomain: "local.")
+        Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in self?.report() }
+    }
+    // Bonjour only carries the network name, like downstage-0001. The One's own page knows the name people gave it
+    func askName(_ host: String, port: Int) {
+        guard let u = URL(string: "http://\(host):\(port)/status") else { return }
+        var r = URLRequest(url: u); r.timeoutInterval = 3
+        URLSession.shared.dataTask(with: r) { data, _, _ in
+            guard let data = data, let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let n = o["name"] as? String, !n.isEmpty else { return }
+            DispatchQueue.main.async {
+                if self.names[host] != n { self.names[host] = n; self.send() }
+            }
+        }.resume()
     }
     func netServiceBrowser(_ b: NetServiceBrowser, didFind s: NetService, moreComing: Bool) {
         services.append(s)
@@ -24,6 +38,10 @@ final class OneFinder: NSObject, NetServiceBrowserDelegate, NetServiceDelegate {
     func netServiceDidResolveAddress(_ s: NetService) { report() }
 
     func report() {
+        send()
+        for s in services { if let host = ipv4(s) { askName(host, port: s.port) } }
+    }
+    func send() {
         var out: [[String: String]] = []
         for s in services {
             guard let host = ipv4(s), let data = s.txtRecordData() else { continue }
@@ -31,7 +49,7 @@ final class OneFinder: NSObject, NetServiceBrowserDelegate, NetServiceDelegate {
             // only a One has a Companion. A One on v1.7.0 or older advertises its serial but no kind
             let serial = txt["serial"] ?? ""
             guard txt["kind"]?.lowercased() == "one" || serial.hasPrefix("DS1-") else { continue }
-            out.append(["id": serial.isEmpty ? s.name : serial, "name": txt["name"] ?? s.name, "host": host])
+            out.append(["id": serial.isEmpty ? s.name : serial, "name": names[host] ?? txt["name"] ?? s.name, "host": host])
         }
         changed(out)
     }
@@ -54,6 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     var web: WKWebView!
     var activity: NSObjectProtocol?
     let finder = OneFinder()
+    let updater = Updater()
     var ones = "[]"
 
     func applicationDidFinishLaunching(_ note: Notification) {
@@ -63,7 +82,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
         buildMenu()
         let config = WKWebViewConfiguration()
         config.userContentController.add(self, name: "finder")   // its presence tells the page a finder is here
+        config.userContentController.add(updater, name: "updates")
         web = WKWebView(frame: .zero, configuration: config)
+        updater.web = web
         web.uiDelegate = self
         web.navigationDelegate = self
         web.setValue(false, forKey: "drawsBackground")
@@ -87,9 +108,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
         finder.start()
     }
 
-    func tellPage() { web.evaluateJavaScript("window.onesFound && window.onesFound(\(ones))", completionHandler: nil) }
+    func tellPage() {
+        #if UPDATE_TEST
+        if ProcessInfo.processInfo.environment["DOWNSTAGE_TEST_LOG"] != nil { print(ones); fflush(stdout) }
+        #endif
+        web.evaluateJavaScript("window.onesFound && window.onesFound(\(ones))", completionHandler: nil)
+    }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { tellPage() }
     func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {}
+
+    @objc func checkForUpdates() {
+        web.evaluateJavaScript("window.updAsked = true") { _, _ in self.updater.check() }
+    }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ app: NSApplication) -> Bool { true }
 
@@ -104,6 +134,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
         let main = NSMenu()
         let appItem = NSMenuItem(); main.addItem(appItem)
         let appMenu = NSMenu()
+        appMenu.addItem(withTitle: "About Downstage Virtual Deck", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        appMenu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "").target = self
+        appMenu.addItem(NSMenuItem.separator())
         appMenu.addItem(withTitle: "Quit Downstage Virtual Deck", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         let editItem = NSMenuItem(); main.addItem(editItem)
