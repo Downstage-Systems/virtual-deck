@@ -21,14 +21,13 @@ final class DeckController: ShellController {
         return page
     }
     // The header runs to the screen's edges and holds its controls clear of the notch. Sideways on a phone it stays
-    // one row to give the deck the height. Keys only keeps its button out of the deck's way: above it upright, beside it sideways
+    // one row to give the deck the height
     override var appStyle: String { """
       header { padding: calc(10px + var(--sa-t)) calc(14px + var(--sa-r)) 10px calc(14px + var(--sa-l) + var(--win-l)) !important; }
       #say, #upd { padding-left: calc(14px + var(--sa-l)) !important; padding-right: calc(14px + var(--sa-r)) !important; }
       #stage { padding: 12px calc(10px + var(--sa-r)) calc(8px + var(--sa-b)) calc(10px + var(--sa-l)) !important; }
-      body.bare #stage { padding: calc(52px + var(--sa-t)) calc(6px + var(--sa-r)) calc(6px + var(--sa-b)) calc(6px + var(--sa-l)) !important; }
-      #exit-bare { top: calc(4px + var(--sa-t)) !important; right: 12px !important; width: 44px; height: 44px; padding: 0 !important; font-size: 0 !important; opacity: .7 !important; }
-      #exit-bare::after { content: "\\2022\\2022\\2022"; font-size: 13px; letter-spacing: 1px; }
+      :root { --bar-h: calc(64px + var(--sa-t)) !important; }
+      #lock { width: 44px !important; padding: 0 !important; }
       input, select, button, a.btn { height: 44px; }
       #ctx button { height: auto; min-height: 44px; }
       @media (max-width: 760px) {
@@ -46,11 +45,8 @@ final class DeckController: ShellController {
         label:has(#model) { font-size: 0; gap: 0; }
         input.addr { flex: 1 1 110px; min-width: 0; }
       }
-      @media (orientation: landscape) {
-        body.bare #stage { padding: calc(6px + var(--win-t)) max(62px, calc(6px + var(--sa-r))) calc(6px + var(--sa-b)) max(62px, calc(6px + var(--sa-l))) !important; }
-        #exit-bare { top: 22px !important; right: 12px !important; }
-      }
       @media (orientation: landscape) and (max-height: 500px) {
+        :root { --bar-h: 56px !important; }
         .grp { display: contents !important; }
         .rule { display: none !important; }
         header { flex-wrap: nowrap !important; gap: 8px !important; padding-top: 6px !important; padding-bottom: 6px !important; overflow-x: auto; }
