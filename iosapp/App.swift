@@ -71,6 +71,9 @@ final class DeckController: ShellController {
     override func configure(_ c: WKUserContentController) {
         c.add(self, name: "finder")   // its presence tells the page a finder is here
         c.add(self, name: "press")
+        // the version sits at the foot of the menu. Added here because the page is shared with the Mac app and the One
+        c.addUserScript(WKUserScript(source: "(function () { const open = openMenu; openMenu = function (x, y, d) { open(x, y, d); const m = document.getElementById('ctx'), v = document.createElement('div'); v.className = 'ctxh'; v.textContent = '\(versionText)'; m.appendChild(document.createElement('hr')); m.appendChild(v); m.style.top = Math.max(4, Math.min(parseFloat(m.style.top), innerHeight - m.offsetHeight - 4)) + 'px'; }; })();",
+                                     injectionTime: .atDocumentEnd, forMainFrameOnly: true))
         c.addUserScript(WKUserScript(source: "document.addEventListener('pointerdown', e => { if (e.target.closest && e.target.closest('.deckgrid [data-k]')) window.webkit.messageHandlers.press.postMessage(1); }, true);",
                                      injectionTime: .atDocumentEnd, forMainFrameOnly: true))
     }

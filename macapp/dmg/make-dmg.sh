@@ -2,7 +2,7 @@
 # Wraps a built app in the disk image people download: the app, an Applications shortcut, the Downstage background.
 #   make-dmg.sh app-zip out.dmg    the zip is the release zip, so both downloads hold the same build, untouched
 # Writes the window layout itself with dmgbuild, so it needs no Finder and no permission prompt.
-# First time: python3 -m venv macapp/dmg/venv && macapp/dmg/venv/bin/pip install dmgbuild==1.6.5
+# First time: python3 -m venv macapp/dmg/venv && macapp/dmg/venv/bin/pip install dmgbuild==1.6.7 (needs Python 3.10+; 1.6.5 shows a blank background on macOS 26.2+)
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; ZIP="$1"; DMG="$2"
 STAGE="$(mktemp -d)"; ditto -x -k "$ZIP" "$STAGE"
