@@ -64,3 +64,17 @@ final class OneFinder: NSObject, NetServiceBrowserDelegate, NetServiceDelegate {
         return nil
     }
 }
+
+// Ticks "Allow page arrows" on one of our own surfaces, through the private connection Companion's web page uses. It refuses
+// a page's origin, so this can only come from the app. If an update ever breaks it, the page tells the user where the box is
+func allowPageArrows(host: String, surface: String) {
+    guard let url = URL(string: "ws://\(host):8000/trpc"), let body = try? JSONSerialization.data(withJSONObject: [
+        "id": 1, "jsonrpc": "2.0", "method": "mutation",
+        "params": ["path": "surfaces.surfaceSetConfigKey", "input": ["surfaceId": surface, "key": "canChangePage", "value": true]],
+    ] as [String: Any]) else { return }
+    let socket = URLSession.shared.webSocketTask(with: url)
+    socket.resume()
+    socket.send(.string(String(decoding: body, as: UTF8.self))) { _ in }
+    socket.receive { _ in socket.cancel(with: .normalClosure, reason: nil) }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 5) { socket.cancel(with: .normalClosure, reason: nil) }
+}

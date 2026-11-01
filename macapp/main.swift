@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
         let config = WKWebViewConfiguration()
         config.userContentController.add(self, name: "finder")   // its presence tells the page a finder is here
         config.userContentController.add(updater, name: "updates")
+        config.userContentController.add(self, name: "pagearrows")
         web = WKWebView(frame: .zero, configuration: config)
         updater.web = web
         web.uiDelegate = self
@@ -51,7 +52,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
         web.evaluateJavaScript("window.onesFound && window.onesFound(\(ones))", completionHandler: nil)
     }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { tellPage() }
-    func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {}
+    func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == "pagearrows", let m = message.body as? [String: String], let host = m["host"], let surface = m["surface"] { allowPageArrows(host: host, surface: surface) }
+    }
 
     @objc func checkForUpdates() {
         web.evaluateJavaScript("window.updAsked = true") { _, _ in self.updater.check() }

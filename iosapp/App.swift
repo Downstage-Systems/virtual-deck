@@ -67,6 +67,7 @@ final class DeckController: ShellController {
     override func configure(_ c: WKUserContentController) {
         c.add(self, name: "finder")   // its presence tells the page a finder is here
         c.add(self, name: "press")
+        c.add(self, name: "pagearrows")
         // the version sits at the foot of the menu. Added here because the page is shared with the Mac app and the One
         c.addUserScript(WKUserScript(source: "(function () { const open = openMenu; openMenu = function (x, y, d) { open(x, y, d); const m = document.getElementById('ctx'), v = document.createElement('div'); v.className = 'ctxh'; v.textContent = '\(versionText)'; m.appendChild(document.createElement('hr')); m.appendChild(v); m.style.top = Math.max(4, Math.min(parseFloat(m.style.top), innerHeight - m.offsetHeight - 4)) + 'px'; }; })();",
                                      injectionTime: .atDocumentEnd, forMainFrameOnly: true))
@@ -88,6 +89,7 @@ final class DeckController: ShellController {
     override func cameForward() { call("connect()"); finder.report() }
     override func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {
         if message.name == "press" { tap.impactOccurred() }
+        if message.name == "pagearrows", let m = message.body as? [String: String], let host = m["host"], let surface = m["surface"] { allowPageArrows(host: host, surface: surface) }
         #if DEBUG
         if message.name == "testlog", let line = message.body as? String { testLine(line) }
         #endif
