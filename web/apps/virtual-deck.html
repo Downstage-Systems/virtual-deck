@@ -915,7 +915,7 @@
     $('rows').value = d.rows;
     $('custom').classList.toggle('on', d.model === 'custom');
     $('surfaces').style.display = S.host ? '' : 'none';
-    $('surfaces').href = 'http://' + S.host + ':8000/#/surfaces';
+    $('surfaces').href = 'http://' + S.host + ':8000/surfaces';
     $('removeDeck').style.display = S.decks.length > 1 ? 'inline-block' : 'none';
     $('addDeck').style.display = S.decks.length < 8 ? '' : 'none';
     document.title = 'Virtual Deck: ' + spec(d).name;
