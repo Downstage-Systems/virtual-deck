@@ -389,7 +389,7 @@
   setInterval(showPages, 1000);
   const PAGE_BOX = '<span class="pa" data-up="0" role="button" aria-label="Previous page"><svg viewBox="0 0 8 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 1.5 1.5 6 6 10.5"/></svg></span><i>Page</i><b></b><span class="pa" data-up="1" role="button" aria-label="Next page"><svg viewBox="0 0 8 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 1.5 6.5 6 2 10.5"/></svg></span>';
   // Companion ignores this until the surface's own checkbox is on, and still says OK, so a page that didn't move is the only sign.
-  // The apps can then tick that box and try again. A page in a browser can't, so it says where the box is
+  // The apps can then tick that box and try again, and so can a One serving this page. Anywhere else it says where the box is
   const readPage = d => fetch('http://' + S.host + ':8000/api/variable/internal/' + encodeURIComponent('surface_' + deviceId(d) + '_page') + '/value').then(r => r.ok ? r.text() : '').catch(() => '');
   const pause = ms => new Promise(done => setTimeout(done, ms));
   async function changePage(d, up) {
@@ -399,7 +399,8 @@
     showPages();
     if (d.fixingPage || await readPage(d) !== was) return;
     d.fixingPage = true;
-    const arrows = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.pagearrows;
+    const arrows = (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.pagearrows)
+      || (served ? { postMessage: m => fetch('/companion/page-arrows', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(m) }).catch(() => {}) } : null);
     if (arrows) {
       arrows.postMessage({ host: S.host, surface: deviceId(d) });
       await pause(800);
