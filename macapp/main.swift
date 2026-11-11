@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
     let finder = OneFinder()
     let updater = Updater()
     var ones = "[]"
+    var companions = "[]"
 
     func applicationDidFinishLaunching(_ note: Notification) {
         // App Nap would stall the page's pings and Companion drops a quiet surface after 5 s (Companion NOTES.md)
@@ -42,6 +43,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
             self.ones = String(decoding: json, as: UTF8.self)
             self.tellPage()
         }
+        finder.findCompanions = true
+        finder.companionsChanged = { [weak self] list in
+            guard let self = self, let json = try? JSONSerialization.data(withJSONObject: list) else { return }
+            self.companions = String(decoding: json, as: UTF8.self)
+            self.tellPage()
+        }
         finder.start()
     }
 
@@ -49,7 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKUIDelegate, WKNaviga
         #if UPDATE_TEST
         if ProcessInfo.processInfo.environment["DOWNSTAGE_TEST_LOG"] != nil { print(ones); fflush(stdout) }
         #endif
-        web.evaluateJavaScript("window.onesFound && window.onesFound(\(ones))", completionHandler: nil)
+        web.evaluateJavaScript("window.onesFound && window.onesFound(\(ones)); window.companionsFound && window.companionsFound(\(companions))", completionHandler: nil)
     }
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { tellPage() }
     func userContentController(_ c: WKUserContentController, didReceive message: WKScriptMessage) {

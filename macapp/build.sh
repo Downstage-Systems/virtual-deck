@@ -26,8 +26,8 @@ cat > "$APP/Contents/Info.plist" <<PL
 <key>LSMinimumSystemVersion</key><string>11.0</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>DownstageAllowedTeams</key><array>$TEAMS</array>
-<key>NSLocalNetworkUsageDescription</key><string>Virtual Deck joins Bitfocus Companion on your network as a Stream Deck surface, and finds Downstage Ones.</string>
-<key>NSBonjourServices</key><array><string>_downstage._tcp</string></array>
+<key>NSLocalNetworkUsageDescription</key><string>Virtual Deck joins Bitfocus Companion on your network as a Stream Deck surface, and finds Companion and Downstage Ones.</string>
+<key>NSBonjourServices</key><array><string>_downstage._tcp</string><string>_companion-satellite-ws._tcp</string></array>
 <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/><key>NSAllowsArbitraryLoadsInWebContent</key><true/></dict>
 </dict></plist>
 PL

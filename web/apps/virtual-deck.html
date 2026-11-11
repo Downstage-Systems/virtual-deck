@@ -9,51 +9,80 @@
      server of its own: the same page runs in the Mac app and from the One. -->
 <style>
   @font-face { font-family: 'Rajdhani'; font-weight: 700; src: url('../fonts/rajdhani-700.woff2') format('woff2'); }
-  @font-face { font-family: 'Inter'; font-weight: 400; src: url('../fonts/inter-400.woff2') format('woff2'); }
-  @font-face { font-family: 'Inter'; font-weight: 600; src: url('../fonts/inter-600.woff2') format('woff2'); }
-  :root { --ground: #0B0D10; --panel: #12161B; --raised: #181D23; --edge: #232A32; --text: #E8ECEF; --muted: #9AA4AD;
-          --green: #2FD97B; --amber: #F5A524; --red: #E5484D; --violet: #8E6FE6; }
+  /* Mac app standard (downstage-clients docs/mac-app-standard.md): the system face, Rajdhani only for names */
+  :root { --ground: #0B0D10; --panel: #12161B; --raised: #181D23; --edge: #232A32; --rule: #1B2128; --ctl: #2E3640;
+          --text: #E8ECEF; --muted: #A3ADB6; --meta: #7C8791;
+          --green: #2FD97B; --amber: #F5A524; --red: #E5484D; --violet: #8E6FE6;
+          --sys: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; --code: ui-monospace, "SF Mono", Menlo, monospace; }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; }
-  body { display: flex; flex-direction: column; background: var(--ground); color: var(--text); font: 400 14px/1.4 'Inter', system-ui, sans-serif;
-         -webkit-user-select: none; user-select: none; overflow: hidden; }
+  body { display: flex; flex-direction: column; background: var(--ground); color: var(--text); font: 400 13px/1.4 var(--sys);
+         -webkit-font-smoothing: antialiased; -webkit-user-select: none; user-select: none; overflow: hidden; }
   .grp { display: flex; align-items: center; gap: 8px; }
   .rule { flex: none; width: 1px; height: 20px; background: var(--edge); }
-  #hostBox { display: none; }
-  #hostBox.on { display: inline-flex; }
-  #found { width: auto; }
-  header { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; padding: 10px 14px; background: var(--panel); border-bottom: 1px solid var(--edge); }
+  header { flex: none; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; min-height: 52px; padding: 12px 12px 12px 14px; background: var(--panel); border-bottom: 1px solid var(--rule); }
   header h1 { margin: 0; font: 700 17px 'Rajdhani', system-ui, sans-serif; white-space: nowrap; }
-  header svg { width: 24px; height: 24px; flex: none; }
+  header > svg { width: 22px; height: 22px; flex: none; }
   label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
-  input, select, button, a.btn { box-sizing: border-box; height: 34px; min-height: 34px; padding: 0 10px; font: 400 14px/1 'Inter', system-ui, sans-serif; color: var(--text); background-color: var(--raised); border: 1px solid var(--edge); }
-  input { border-radius: 4px; -webkit-user-select: text; user-select: text; }
+  input, select, button, a.btn { box-sizing: border-box; height: 28px; min-height: 28px; padding: 0 10px; font: 400 13px/1 var(--sys); color: var(--text); background-color: var(--raised); border: 1px solid var(--ctl); }
+  input { border-radius: 6px; -webkit-user-select: text; user-select: text; }
+  :focus-visible { outline: 2px solid rgba(232,236,239,.55); outline-offset: 1px; }
   input::placeholder { color: var(--muted); }
   input:focus, select:focus { outline: none; border-color: var(--muted); }
-  select { -webkit-appearance: none; appearance: none; border-radius: 4px; padding-right: 26px; text-overflow: ellipsis; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%239AA4AD' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 9px center; }
-  button, a.btn { border-radius: 6px; font-weight: 600; white-space: nowrap; cursor: pointer; }
-  button:hover, a.btn:hover { border-color: var(--muted); }
-  input.addr { width: 140px; }
+  select { -webkit-appearance: none; appearance: none; border-radius: 6px; padding-right: 26px; text-overflow: ellipsis; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23A3ADB6' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 9px center; }
+  button, a.btn { border-radius: 6px; font-weight: 500; white-space: nowrap; cursor: default; }
+  button:hover, a.btn:hover { border-color: #46515D; }
   input.num { width: 56px; }
   .sp { flex: 1 1 0; min-width: 0; }
-  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--amber); flex: none; }
-  .dot.ok { background: var(--green); }
-  .dot.off { background: var(--red); }
-  #upd { display: none; flex: none; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 14px; font-size: 13px; background: var(--raised); border-bottom: 1px solid var(--edge); }
+  /* the show's name, with Edited or Not saved yet beside it. Inside the Mac app the window title carries it */
+  .doc { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+  #showName { font: 700 15px 'Rajdhani', var(--sys); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+  #docState { font-size: 12px; color: var(--meta); white-space: nowrap; }
+  #docState:empty { display: none; }
+  /* where the deck connects, as a pale chip: live green when every deck is in Companion, amber otherwise. It opens its settings */
+  .cstat { flex: none; max-width: 240px; padding: 0 11px; border: 0; border-radius: 999px; display: inline-flex; align-items: center; gap: 7px;
+           font: 500 12px/1 var(--sys); background: #10301D; color: #74E8A8; overflow: hidden; text-overflow: ellipsis; }
+  .cstat::before { content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+  .cstat.bad { background: #33270F; color: #F7C066; }
+  .cstat.bad::before { background: #F7C066; }
+  .cstat span { overflow: hidden; text-overflow: ellipsis; }
+  .cstat:hover { filter: brightness(1.12); }
+  @media (pointer: fine) { .cstat { height: 24px; min-height: 24px; } }
+  /* quiet icon buttons: the shows menu and the lock */
+  .ib { flex: none; min-width: 30px; padding: 0 7px; display: inline-grid; place-items: center; color: var(--muted); background: none; border: 0; }
+  .ib:hover, .ib.open { background: var(--raised); color: var(--text); }
+  .ib svg { width: 16px; height: 16px; }
+  #more svg circle { fill: currentColor; }
+  body.inapp #more, body.inapp #docGrp, body.inapp #docGrp + .rule { display: none !important; }
+  /* the connection settings, under the chip */
+  #connPop { position: fixed; z-index: 100000; width: min(290px, calc(100vw - 16px)); display: flex; flex-direction: column; gap: 10px; padding: 12px;
+             background: #1C2229; border: 1px solid var(--ctl); border-radius: 8px; box-shadow: 0 14px 34px rgba(0,0,0,.5); }
+  #connPop[hidden] { display: none; }
+  #connPop .ph { font-weight: 600; }
+  #connText { margin: 0; color: var(--muted); font-size: 12px; }
+  #connText:empty { display: none; }
+  #connList { display: flex; flex-direction: column; gap: 1px; margin: 0 -7px; }
+  #connList:empty { display: none; }
+  #connList button { display: flex; align-items: center; gap: 8px; width: 100%; height: auto; min-height: 28px; padding: 3px 7px; text-align: left; background: none; border: 0; border-radius: 5px; }
+  #connList button:hover { background: #34404C; }
+  #connList button span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  #connList button small { font: 12px var(--code); color: var(--meta); }
+  #connList button b { width: 12px; font-weight: 600; }
+  .pf { display: grid; gap: 4px; font-size: 12px; color: var(--meta); }
+  .pf input { width: 100%; min-width: 0; background: var(--ground); font: 12.5px var(--code); }
+  #surfaces { justify-content: center; }
+  #upd { display: none; flex: none; align-items: center; gap: 10px; flex-wrap: wrap; padding: 6px 14px; font-size: 13px; background: var(--raised); border-bottom: 1px solid var(--rule); }
   #upd.on { display: flex; }
   #updText { flex: 1; min-width: 160px; }
   #upd button { min-height: 28px; padding: 2px 10px; }
   #updGo { border-color: var(--green); }
-  #found { display: none; max-width: 200px; }
-  #found.on { display: inline-block; }
   #custom { display: none; align-items: center; gap: 8px; }
   #custom.on { display: inline-flex; }
   a.btn { display: inline-flex; align-items: center; text-decoration: none; }
   #say { flex: none; padding: 6px 14px; font-size: 13px; color: var(--muted); }
   #say:empty { display: none; }
   /* the deck itself: an aluminum body, glass keys in their wells, knurled dials */
-  #stage { flex: 1; min-height: 0; position: relative; overflow: hidden; padding: 18px; touch-action: none;
-           background: radial-gradient(ellipse 70% 60% at 50% 42%, #1a2027 0%, var(--ground) 72%); }
+  #stage { flex: 1; min-height: 0; position: relative; overflow: hidden; padding: 18px; touch-action: none; background: var(--ground); }
   .chassis { position: absolute; padding: var(--pad) var(--pad) calc(var(--pad) * 1.5); border-radius: calc(var(--cell) * .3 + 8px);
              background: linear-gradient(165deg, #2b323a 0%, #1b2026 26%, #14181d 62%, #101317 100%);
              box-shadow: inset 0 1px 0 rgba(255,255,255,.14), inset 1px 0 0 rgba(255,255,255,.04), inset 0 -2px 3px rgba(0,0,0,.6),
@@ -72,7 +101,7 @@
   .pa::after { content: ""; position: absolute; inset: -2px -9px -10px; }
   .pa svg { width: .6em; height: .9em; }
   .pa:active { color: var(--green); }
-  .pg i { font-style: normal; font-weight: 500; font-size: .85em; letter-spacing: .04em; text-transform: uppercase; color: rgba(232,236,239,.55); }
+  .pg i { font-style: normal; font-weight: 500; font-size: .9em; color: rgba(232,236,239,.55); }
   .led.ok { background: var(--green); box-shadow: 0 0 7px var(--green); }
   .led.off { background: var(--red); box-shadow: 0 0 6px var(--red); }
   .key, .seg, .dial { position: relative; overflow: hidden; touch-action: none; }
@@ -109,33 +138,30 @@
   .grip::after { content: ""; position: absolute; right: min(calc(var(--pad) * .7), 16px); bottom: calc(var(--pad) * .75 - clamp(5px, calc(var(--pad) * .45), 11px) / 2); width: clamp(5px, calc(var(--pad) * .45), 11px); height: clamp(5px, calc(var(--pad) * .45), 11px); border-right: 2px solid rgba(232,236,239,.4); border-bottom: 2px solid rgba(232,236,239,.4); border-bottom-right-radius: 40%; }
   body.locked .grip { display: none; }
   #removeDeck, #arrange { display: none; }
-  #show { max-width: 190px; }
   #sheet { display: none; position: fixed; inset: 0; z-index: 100001; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,.55); }
   #sheet.on { display: flex; }
   #sheetBox { width: 100%; max-width: 360px; padding: 18px; background: var(--panel); border: 1px solid var(--edge); border-radius: 6px; }
-  #sheetTitle { display: block; font: 700 18px 'Rajdhani', system-ui, sans-serif; }
+  #sheetTitle { display: block; font-size: 13px; font-weight: 600; }
   #sheetText { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
   #sheetText:empty { display: none; }
   #sheetName { width: 100%; margin-top: 12px; }
   .sheetBtns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
   #sheetAlt:empty { display: none; }
-  #sheetGo { background: var(--green); border-color: var(--green); color: #0b0d10; }
-  #sheetGo.danger { background: #3a1517; border-color: var(--red); color: #ff9a9d; }
+  #sheetGo { background: var(--green); border-color: var(--green); color: #06140C; font-weight: 600; }
+  #sheetGo.danger { background: #3a1517; border-color: #3a1517; color: #ff9a9d; }
   #ctx { display: none; position: fixed; z-index: 100000; min-width: 220px; max-height: calc(100vh - 8px); overflow: auto; padding: 5px; background: #1b2026; border: 1px solid var(--edge); border-radius: 8px; box-shadow: 0 12px 34px rgba(0,0,0,.7); }
   #ctx.on { display: block; }
-  #ctx button { display: flex; align-items: center; gap: 9px; width: 100%; height: auto; min-height: 28px; padding: 3px 10px 3px 8px; text-align: left; font-weight: 400; background: none; border: 0; border-radius: 5px; }
-  @media (hover: hover) { #ctx button:hover { background: var(--green); color: #0b0d10; } #ctx button:hover i, #ctx button:hover .ck { color: inherit; } }
-  #ctx button:active { background: var(--green); color: #0b0d10; }
+  #ctx button { display: flex; align-items: center; gap: 9px; width: 100%; height: auto; min-height: 26px; padding: 3px 10px 3px 8px; text-align: left; font-weight: 400; background: none; border: 0; border-radius: 5px; }
+  @media (hover: hover) { #ctx button:hover { background: #34404C; } #ctx button:hover i { color: var(--text); } }
+  #ctx button:active { background: #34404C; }
   #ctx i { flex: none; display: flex; width: 16px; height: 16px; color: var(--muted); }
   #ctx i svg { width: 16px; height: 16px; }
   #ctx span { flex: 1; }
-  #ctx .ck { flex: none; margin-left: 14px; font-weight: 600; color: var(--green); }
+  #ctx .ck { flex: none; margin-left: 14px; font-weight: 600; color: var(--text); }
   #ctx button.danger { color: #ff9a9d; }
   #ctx button.danger i { color: #ff9a9d; }
-  #ctx hr { margin: 5px 6px; border: 0; border-top: 1px solid var(--edge); }
-  .ctxh { padding: 3px 10px 4px 8px; font-size: 12px; color: var(--muted); }
-  .lockbtn { width: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--dim); }
-  .lockbtn svg { width: 16px; height: 16px; }
+  #ctx hr { margin: 5px 6px; border: 0; border-top: 1px solid var(--ctl); }
+  .ctxh { padding: 6px 10px 3px 8px; font-size: 12px; color: var(--meta); }
   .lockbtn.on { color: var(--green); }
   #tray { display: none; }
   /* a narrow window: the controls sit on a tray over the decks, so opening it never moves them. Swiped up to close and down to open. Closed, it keeps the logo, status dot and lock */
@@ -151,24 +177,22 @@
     body.trayshut #lock { margin-left: auto; }
     html body.trayshut header { padding-bottom: 10px !important; }
     body.trayshut header > :not(svg):not(#lock):not(#connGrp):not(#tray) { display: none !important; }
-    body.trayshut #connGrp { display: flex !important; }
-    body.trayshut #connGrp > :not(#dot) { display: none !important; }
+    body.trayshut #connGrp { display: flex !important; min-width: 0; }
     body.trayshut #tray { top: var(--sa-t, 0px); bottom: 0; height: auto !important; }
   }
   @media (max-width: 560px) {
-    header { display: grid; grid-template-columns: auto 2fr 1fr auto auto; grid-template-areas: "logo show show save lock" "conn conn model model model"; gap: 8px; }
-    header:has(#hostBox.on) { grid-template-areas: "logo show show save lock" "conn conn conn conn conn" "model model model model model"; }
+    header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; grid-template-areas: "logo doc more lock" "model model conn conn"; gap: 8px; }
     header h1, header .rule, header .sp, #deckName { display: none !important; }
-    #showGrp, #deckGrp { display: contents !important; }
-    #connGrp { grid-area: conn; display: flex !important; min-width: 0; }
+    #deckGrp { display: contents !important; }
+    #docGrp { grid-area: doc; }
+    #showName { max-width: none; }
+    #connGrp { grid-area: conn; display: flex !important; min-width: 0; justify-content: flex-end; }
+    .cstat { max-width: 100%; }
     header > svg { grid-area: logo; align-self: center; }
-    #show { grid-area: show; width: 100%; min-width: 0; max-width: none !important; }
-    #saveShow { grid-area: save; }
+    #more { grid-area: more; }
     #lock { grid-area: lock; }
     label:has(#model) { grid-area: model; display: flex; min-width: 0; }
     #model { flex: 1; width: 100%; min-width: 0; }
-    #found, #hostBox { flex: 1 1 0; min-width: 0; max-width: none !important; }
-    #hostBox input { width: 100%; }
     #custom.on { grid-column: 1 / -1; display: flex; gap: 12px; }
     #custom.on label { flex: 1; display: flex; align-items: center; gap: 8px; }
     #custom.on input { flex: 1; width: 100%; min-width: 0; }
@@ -183,10 +207,7 @@
   <svg viewBox="0 0 96 96" aria-hidden="true"><rect x="6" y="10" width="84" height="66" rx="10" fill="none" stroke="#e8ecef" stroke-width="7"/><rect x="20" y="54" width="40" height="9" rx="4.5" fill="#2fd97b"/><rect x="64" y="54" width="12" height="9" rx="4.5" fill="#e8ecef" opacity="0.28"/><rect x="20" y="83" width="56" height="7" rx="3.5" fill="#2fd97b"/></svg>
   <h1>Virtual Deck</h1>
   <span class="rule"></span>
-  <div class="grp" id="showGrp">
-    <select id="show" title="Your saved shows: each one remembers its decks and where they sit"></select>
-    <button id="saveShow" title="Save this show">Save</button>
-  </div>
+  <div class="doc" id="docGrp" title="This show: its decks and where they sit. Saved shows are in the menu at the right"><b id="showName"></b><span id="docState"></span></div>
   <span class="rule"></span>
   <div class="grp" id="deckGrp">
     <label><span id="deckName">Deck</span> <select id="model"></select></label>
@@ -194,26 +215,28 @@
       <label>Columns <input class="num" id="cols" type="number" min="1" max="32"></label>
       <label>Rows <input class="num" id="rows" type="number" min="1" max="16"></label>
     </span>
-    <button id="addDeck" title="Add another deck, as its own surface in Companion">+ Deck</button>
+    <button id="addDeck" title="Add another deck, as its own surface in Companion">Add deck</button>
     <button id="removeDeck" title="Remove the outlined deck">Remove</button>
     <button id="arrange" title="Put every deck back in its place">Arrange</button>
   </div>
   <span class="sp"></span>
-  <div class="grp" id="connGrp">
-    <span class="dot" id="dot"></span>
-    <select id="found" title="Downstage Ones on this network"></select>
-    <label id="hostBox"><input class="addr" id="host" aria-label="Companion address" title="Companion address" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="Companion address"></label>
-    <a class="btn" id="surfaces" target="_blank" rel="noopener" title="Choose this deck's page in Companion">Surfaces</a>
-    <span class="rule"></span>
-  </div>
+  <div class="grp" id="connGrp"><button class="cstat bad" id="conn" aria-haspopup="dialog"><span id="connWord">Finding Companion…</span></button></div>
+  <button class="ib" id="more" title="Shows and more" aria-label="Shows and more"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="3.5" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="12.5" cy="8" r="1.3"/></svg></button>
   <div id="tools" hidden></div>
-  <button class="lockbtn" id="lock"></button>
+  <button class="ib lockbtn" id="lock"></button>
   <button id="tray" title="Swipe up to close, down to open" aria-label="Show or hide the controls"></button>
 </header>
 <div id="upd"><span id="updText"></span><button id="updGo">Update now</button><button id="updLater">Later</button></div>
 <div id="say"></div>
 <div id="stage"></div>
 <div id="ctx"></div>
+<div id="connPop" role="dialog" aria-label="Companion" hidden>
+  <b class="ph">Companion</b>
+  <p id="connText"></p>
+  <div id="connList"></div>
+  <label class="pf">Address<input id="host" aria-label="Companion address" spellcheck="false" autocapitalize="off" autocorrect="off" placeholder="Like 192.168.1.20"></label>
+  <a class="btn" id="surfaces" target="_blank" rel="noopener" title="Choose each deck's page in Companion">Open Surfaces in Companion</a>
+</div>
 <div id="sheet"><form id="sheetBox"><b id="sheetTitle"></b><p id="sheetText"></p><input id="sheetName" maxlength="60" spellcheck="false" autocomplete="off"><div class="sheetBtns"><button type="button" id="sheetCancel">Cancel</button><button type="button" id="sheetAlt"></button><button type="submit" id="sheetGo"></button></div></form></div>
 
 <script>
@@ -235,14 +258,15 @@
   };
   const clamp = (v, lo, hi, d) => { const n = parseInt(v, 10); return isNaN(n) ? d : Math.min(hi, Math.max(lo, n)); };
 
-  // Which Companion: ?host= first, then the unit serving this page, then a typed address, then a
-  // One the Mac app finds. A found One is followed by its id, because venues give it new addresses.
+  // Which Companion: ?host= first, then the unit serving this page, then a typed address, then what the app finds by
+  // itself: Companion on this Mac, then one on the network, then a One. A found one is followed by its id, because
+  // venues hand out new addresses.
   const params = new URLSearchParams(location.search);
   const served = /^https?:$/.test(location.protocol) ? location.hostname : '';
   const S = {
     host: params.get('host') || served || store.get('host', ''),
     oneId: params.get('host') || served ? '' : store.get('one', ''),
-    ones: [],
+    ones: [], comps: [], local: false, t0: Date.now(), state: 'off', note: '',
     decks: [], sel: null, top: 1, snap: store.get('snap', '1') === '1',
     ws: null, retry: 0, ping: 0,
   };
@@ -270,8 +294,8 @@
 
   function say(text) { $('say').textContent = text; }
   function dot(state) {
-    $('dot').className = 'dot' + (state ? ' ' + state : '');
-    $('dot').title = { ok: 'In Companion', off: 'Not connected' }[state] || 'Connecting';
+    S.state = state;
+    if (typeof paintConn === 'function') paintConn();
     for (const d of S.decks) if (d.el) d.el.querySelector('.led').className = 'led' + ((state === 'ok' ? d.ok : state !== 'ok') && state ? ' ' + state : '');
   }
   const allOk = () => S.decks.every(d => d.ok);
@@ -455,10 +479,10 @@
   }
   function connect() {
     clearTimeout(S.retry);
-    if (!S.host) { dot('off'); say(NATIVE ? 'Looking for a Downstage One. Or type your Companion\u2019s address, like 192.168.1.20.' : 'Type your Companion\u2019s address, like 192.168.1.20.'); return; }
+    if (!S.host) { dot('off'); return; }
     if (S.ws) { const w = S.ws; S.ws = null; w.onclose = null; try { w.close(); } catch (e) {} }
     clearInterval(S.ping);
-    S.decks.forEach(d => d.ok = false); dot(''); say('Joining Companion at ' + S.host + '…');
+    S.note = ''; S.decks.forEach(d => d.ok = false); dot('');
     let ws;
     try { ws = new WebSocket('ws://' + S.host + ':16623'); }
     catch (e) { dot('off'); say('That Companion address doesn’t look right.'); return; }
@@ -470,8 +494,9 @@
     ws.onmessage = e => String(e.data).split('\n').forEach(l => l && line(l));
     ws.onclose = () => {
       if (S.ws !== ws) return;
-      clearInterval(S.ping); S.ws = null; S.decks.forEach(d => d.ok = false); dot('off');
-      say('Companion isn’t answering at ' + S.host + ' (Satellite port 16623, Companion 4.0 or later). Trying again…');
+      clearInterval(S.ping); S.ws = null; S.decks.forEach(d => d.ok = false);
+      S.note = 'Companion isn’t answering at ' + S.host + '. It needs Companion 4.0 or later, with its Satellite port 16623 open. Trying again…';
+      dot('off');
       S.retry = setTimeout(connect, 3000);
     };
   }
@@ -485,7 +510,7 @@
     const [cmd, a, rest] = parse(l), d = S.decks.find(x => deviceId(x) === a.DEVICEID) || S.decks[0];
     if (cmd === 'ADD-DEVICE') {
       if (/^OK/.test(rest)) { d.ok = true; dot(allOk() ? 'ok' : ''); if (allOk()) say(''); }
-      else if (/^ERROR/.test(rest)) { d.ok = false; dot('off'); say('Companion refused this deck: ' + (a.MESSAGE || rest)); }
+      else if (/^ERROR/.test(rest)) { d.ok = false; S.note = 'Companion refused this deck: ' + (a.MESSAGE || rest); dot('off'); say(S.note); }
     } else if (cmd === 'KEY-STATE') {
       const n = +a.KEY;
       if (isNaN(n)) return;
@@ -676,21 +701,20 @@
   const showNames = () => Object.keys(shows.list).sort((a, b) => a.localeCompare(b));
   const showChanged = () => !shows.now || JSON.stringify(shows.list[shows.now]) !== JSON.stringify(layoutNow());
   function writeShows() { store.set('shows', JSON.stringify(shows.list)); store.set('show', shows.now); paintShows(); }
+  // an untitled show with one deck nobody has moved has nothing worth saving yet
+  const isBlank = () => !shows.now && S.decks.length === 1 && !Object.keys(S.decks[0].pos).length;
   function paintShows() {
-    const f = $('show'), names = showNames(), changed = showChanged();
-    f.innerHTML = (shows.now ? '' : '<option value="">Untitled show</option>') +
-      names.map(n => '<option value="s:' + esc(n) + '">' + esc(n) + (n === shows.now && changed ? ' (changed)' : '') + '</option>').join('') +
-      '<option disabled>\u2500\u2500\u2500</option><option value="new">New show</option><option value="saveas">Save as\u2026</option>' +
-      (shows.now ? '<option value="rename">Rename\u2026</option><option value="delete">Delete\u2026</option>' : '');
-    f.value = shows.now ? 's:' + shows.now : '';
-    $('saveShow').disabled = !!shows.now && !changed;
+    const name = shows.now || 'Untitled show';
+    $('showName').textContent = name;
+    $('docState').textContent = shows.now ? (showChanged() ? 'Edited' : '') : (isBlank() ? '' : 'Not saved yet');
+    document.title = name + ' \u00b7 Virtual Deck';
   }
   function askSheet(o) {
     $('sheetTitle').textContent = o.title;
     $('sheetText').textContent = o.text || '';
     $('sheetName').style.display = o.name === undefined ? 'none' : '';
     $('sheetName').value = o.name || '';
-    $('sheetName').placeholder = 'Show name';
+    $('sheetName').placeholder = o.placeholder || 'Show name';
     $('sheetGo').textContent = o.go;
     $('sheetGo').classList.toggle('danger', !!o.danger);
     $('sheetAlt').textContent = o.alt || '';
@@ -728,7 +752,7 @@
   }
   // Leaving a changed show asks first, and Cancel leaves everything as it was
   function leaving(then) {
-    if (!showChanged() || (!shows.now && S.decks.length === 1 && !Object.keys(S.decks[0].pos).length)) return then();
+    if (!showChanged() || isBlank()) return then();
     askSheet({ title: 'Save "' + (shows.now || 'Untitled show') + '" first?', go: 'Save', alt: 'Don\u2019t save', other: then, done: () => {
       if (shows.now) { keepShow(shows.now); then(); }
       else askSheet({ title: 'Save show', name: '', go: 'Save', done: name => { keepShow(name); then(); } });
@@ -736,20 +760,12 @@
   }
   function openShow(name) { leaving(() => { shows.now = name; applyLayout(shows.list[name]); writeShows(); }); }
   function newShow() { leaving(() => { shows.now = ''; applyLayout([{ n: 1, model: S.decks[0].model, cols: S.decks[0].cols, rows: S.decks[0].rows, pos: {} }]); writeShows(); }); }
-  $('show').onchange = () => {
-    const v = $('show').value;
-    paintShows();
-    if (v.startsWith('s:')) { if (v.slice(2) !== shows.now) openShow(v.slice(2)); }
-    else if (v === 'new') newShow();
-    else if (v === 'saveas') saveAs();
-    else if (v === 'rename') askSheet({ title: 'Rename show', name: shows.now, go: 'Rename', done: name => {
-      if (name === shows.now) return;
-      if (shows.list[name]) { askSheet({ title: 'That name is taken', text: 'Another show is already called "' + name + '".', go: 'OK', done: () => {} }); return; }
-      shows.list[name] = shows.list[shows.now]; delete shows.list[shows.now]; shows.now = name; writeShows();
-    } });
-    else if (v === 'delete') askSheet({ title: 'Delete "' + shows.now + '"?', text: 'The decks on screen stay as they are.', go: 'Delete', danger: true, done: () => { delete shows.list[shows.now]; shows.now = ''; writeShows(); } });
-  };
-  $('saveShow').onclick = saveShow;
+  const renameShow = () => askSheet({ title: 'Rename show', name: shows.now, go: 'Rename', done: name => {
+    if (name === shows.now) return;
+    if (shows.list[name]) { askSheet({ title: 'That name is taken', text: 'Another show is already called "' + name + '".', go: 'OK', done: () => {} }); return; }
+    shows.list[name] = shows.list[shows.now]; delete shows.list[shows.now]; shows.now = name; writeShows();
+  } });
+  const deleteShow = () => askSheet({ title: 'Delete "' + shows.now + '"?', text: 'The decks on screen stay as they are.', go: 'Delete', danger: true, done: () => { delete shows.list[shows.now]; shows.now = ''; writeShows(); } });
   document.addEventListener('keydown', e => { if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); saveShow(); } });
 
   // ── the right click menu: this deck's type, then the things for all of them ──
@@ -786,19 +802,20 @@
       rows.push('<div class="ctxh">Deck ' + (S.decks.indexOf(d) + 1) + '</div>');
       for (const [k, m] of Object.entries(MODELS)) rows.push(item('model', deckIcon(k), m.name, { v: k, on: d.model === k }));
       rows.push('<hr>');
-      if (d.page) rows.push('<div class="ctxh">Page ' + d.page + '</div>', item('pageNext', ICON.next, 'Next Page'), item('pagePrev', ICON.prev, 'Previous Page'), '<hr>');
+      if (d.page) rows.push('<div class="ctxh">Page ' + d.page + '</div>', item('pageNext', ICON.next, 'Next page'), item('pagePrev', ICON.prev, 'Previous page'), '<hr>');
     }
     const names = showNames();
     if (names.length) {
       rows.push('<div class="ctxh">Shows</div>');
       for (const n of names) rows.push(item('show', ICON.show, n, { v: n, on: n === shows.now }));
     }
-    rows.push(item('saveShow', ICON.save, 'Save Show'), item('saveAs', ICON.saveAs, 'Save Show As…'), '<hr>');
-    rows.push(item('add', ICON.add, 'Add Deck'));
-    if (d && S.decks.length > 1) rows.push(item('remove', ICON.remove, 'Remove This Deck', { danger: true }));
-    if (!S.locked && S.decks.some(x => Object.keys(x.pos).length)) rows.push(item('arrange', ICON.arrange, 'Arrange Decks'));
+    rows.push(item('newShow', ICON.add, 'New show'), item('saveShow', ICON.save, 'Save show'), item('saveAs', ICON.saveAs, 'Save show as…'));
+    if (shows.now) rows.push(item('rename', ICON.saveAs, 'Rename show…'), item('delete', ICON.remove, 'Delete show…', { danger: true }));
+    rows.push('<hr>', item('add', ICON.add, 'Add deck'));
+    if (d && S.decks.length > 1) rows.push(item('remove', ICON.remove, 'Remove this deck', { danger: true }));
+    if (!S.locked && S.decks.some(x => Object.keys(x.pos).length)) rows.push(item('arrange', ICON.arrange, 'Arrange decks'));
     rows.push(item('snap', ICON.snap, 'Snapping', { on: S.snap }));
-    rows.push(item('lock', S.locked ? ICON.locked : ICON.unlocked, 'Lock Layout', { on: S.locked }));
+    rows.push(item('lock', S.locked ? ICON.locked : ICON.unlocked, 'Lock layout', { on: S.locked }));
     rows.push('<hr>');
     if (S.host) rows.push(item('surfaces', ICON.surfaces, 'Open Surfaces in Companion'));
     const m = $('ctx');
@@ -825,6 +842,9 @@
     if (a === 'model' && d.model !== b.dataset.v) changeDeck(d, () => { d.model = b.dataset.v; paintHeader(); });
     else if (a === 'show') { if (b.dataset.v !== shows.now) openShow(b.dataset.v); }
     else if (a === 'saveShow') saveShow();
+    else if (a === 'newShow') newShow();
+    else if (a === 'rename') renameShow();
+    else if (a === 'delete') deleteShow();
     else if (a === 'saveAs') saveAs();
     else if (a === 'add') addDeck();
     else if (a === 'remove') removeDeck(d);
@@ -837,50 +857,113 @@
 
   // ── finding a One: the Mac app browses Bonjour and calls this with what's on the network ──
   const NATIVE = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.finder);
-  function useHost(host, oneId) {
-    S.guess = false;
-    S.typing = false;
-    S.oneId = oneId;
-    store.set('one', oneId);
-    store.set('host', oneId ? '' : host);
+  // inside the Mac app the window and its menu bar carry the show's name and commands; elsewhere the toolbar and the "..." menu do
+  const MENUBAR = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.menu);
+  document.body.classList.toggle('inapp', MENUBAR);
+  function useHost(host, id) {
+    S.choose = false;
+    S.oneId = id;
+    store.set('one', id);
+    store.set('host', id ? '' : host);
     $('host').value = host;
+    if (S.sheet && S.sheet.address) closeSheet();
     if (host === S.host && S.ws) { paintFound(); return; }
     S.host = host; for (const d of S.decks) { d.imgs = {}; build(d); } paintHeader(); paintFound(); connect();
   }
-  // One control for where this deck connects: the Ones on the network, or an address. The box only shows when one is needed
+  // Everything found, in the order it's tried: Companion on this Mac, a Companion elsewhere on the network, then a One.
+  // A One's own Companion shows up as a network Companion too, so it's listed once, as the One
+  function candidates() {
+    const out = [], oneAt = new Set(S.ones.map(o => o.host));
+    if (S.local || S.comps.some(c => c.local)) out.push({ id: 'mac', kind: 'mac', name: 'This Mac', host: '127.0.0.1' });
+    for (const c of S.comps) if (!c.local && !oneAt.has(c.host)) out.push({ id: 'c:' + c.id, kind: 'companion', name: c.name, host: c.host });
+    for (const o of S.ones) out.push({ id: o.id, kind: 'one', name: o.name, host: o.host });
+    return out;
+  }
+  // Nothing chosen yet: the first kind that turns up alone is used. Two of a kind and the person picks. A choice from
+  // last time gets a few seconds to answer before the order takes over
+  function autoPick() {
+    if (S.host) return;
+    const c = candidates();
+    if (S.oneId && !c.some(o => o.id === S.oneId) && Date.now() - S.t0 < 6000) { S.pick = setTimeout(autoPick, 1000); return; }
+    const mac = c.find(o => o.kind === 'mac');
+    if (mac) return useHost(mac.host, mac.id);
+    for (const kind of ['companion', 'one']) {
+      const k = c.filter(o => o.kind === kind);
+      if (k.length === 1) return useHost(k[0].host, k[0].id);
+      if (k.length > 1) { S.choose = true; paintConn(); return; }
+    }
+  }
+  function found() {
+    const mine = candidates().find(o => o.id === S.oneId);
+    if (mine && mine.host !== S.host) useHost(mine.host, mine.id);
+    paintFound();
+    clearTimeout(S.pick);
+    S.pick = setTimeout(autoPick, 1500);
+  }
+  window.onesFound = list => { S.ones = list; found(); };
+  window.companionsFound = list => { S.comps = list.map(c => Object.assign({}, c, { local: c.local === '1' })); found(); };
+  // a Companion on this Mac with Bonjour turned off still answers on its Satellite port
+  function probeMac() {
+    let w;
+    try { w = new WebSocket('ws://127.0.0.1:16623'); } catch (e) { return; }
+    const t = setTimeout(() => { try { w.close(); } catch (e) {} }, 1500);
+    w.onopen = () => { clearTimeout(t); try { w.close(); } catch (e) {} S.local = true; found(); };
+    w.onerror = () => {};
+  }
+  // Asked only when nothing turned up. A Companion found while it's open answers it instead
+  function askAddress() {
+    if (S.host || S.asked || candidates().length || S.sheet) return;
+    S.asked = true;
+    askSheet({ title: 'Where is Companion?', text: 'Nothing turned up on this network. Type the address of the computer running Companion, like 192.168.1.20.',
+               name: '', placeholder: 'Companion address', go: 'Connect', address: true, done: v => { const h = cleanHost(v); if (h) useHost(h, ''); } });
+  }
+  const cleanHost = v => v.trim().replace(/^https?:\/\//, '').replace(/[:/].*$/, '');
+
+  // ── the connection chip and its settings ──
+  function connName() {
+    const o = candidates().find(x => x.id === S.oneId && x.host === S.host);
+    return o ? o.name : S.host === '127.0.0.1' ? 'This Mac' : S.host;
+  }
+  function paintConn() {
+    const live = !!S.host && S.state === 'ok', name = S.host ? connName() : '';
+    let word, text;
+    if (!S.host) {
+      const looking = NATIVE && Date.now() - S.t0 < 6000;
+      word = S.choose ? 'Choose Companion' : looking ? 'Finding Companion…' : 'Add Companion';
+      text = S.choose ? 'More than one is on this network. Choose where this deck connects.' : looking ? 'Looking on this network…' : 'Choose where Companion is, or type its address.';
+    } else if (live) { word = name; text = 'Connected to Companion ' + (S.host === '127.0.0.1' ? 'on this Mac.' : name !== S.host ? 'on ' + name + ' (' + S.host + ').' : 'at ' + S.host + '.'); }
+    else if (S.state === 'off') { word = 'Companion not answering'; text = S.note || 'Not connected to ' + S.host + '.'; }
+    else { word = 'Joining Companion…'; text = 'Joining Companion at ' + S.host + '…'; }
+    $('connWord').textContent = word;
+    $('conn').classList.toggle('bad', !live);
+    $('conn').title = text;
+    $('connText').textContent = text;
+  }
   function paintFound() {
-    const f = $('found'), n = S.ones.length, on = S.ones.find(o => o.id === S.oneId && o.host === S.host);
-    const label = o => S.ones.filter(x => x.name === o.name).length > 1 ? o.name + ' (' + o.host + ')' : o.name;
-    const typed = !on && (S.typing || (!!S.host && !S.guess));
-    f.classList.toggle('on', n > 0);
-    f.innerHTML = (on || typed ? '' : '<option value="">' + (n === 1 ? 'Downstage One Found' : n + ' Downstage Ones Found') + '</option>') +
-      S.ones.map(o => '<option value="' + esc(o.id) + '">' + esc(label(o)) + '</option>').join('') +
-      '<option value="other">Other address\u2026</option>';
-    f.value = on ? S.oneId : typed ? 'other' : '';
-    f.title = on ? on.host : 'Downstage Ones on this network';
-    $('hostBox').classList.toggle('on', !n || typed);
+    const c = candidates();
+    $('connList').innerHTML = c.map(o => '<button data-pick="' + esc(o.id) + '"><b>' + (o.id === S.oneId && o.host === S.host ? '\u2713' : '') + '</b><span>' + esc(o.name) + '</span><small>' + esc(o.host) + '</small></button>').join('');
+    paintConn();
   }
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  window.onesFound = list => {
-    S.ones = list;
-    const mine = S.ones.find(o => o.id === S.oneId);
-    if (mine) { if (mine.host !== S.host) useHost(mine.host, mine.id); }
+  function openConn() {
+    const p = $('connPop'), r = $('conn').getBoundingClientRect();
     paintFound();
-    // nothing chosen yet: use a lone One, after a moment for any others to answer. With two, the person picks;
-    // a Companion already working on this Mac stays
-    clearTimeout(S.pick);
-    S.pick = setTimeout(() => {
-      if ((S.host && !(S.guess && !allOk())) || !S.ones.length) return;
-      if (S.ones.length === 1) useHost(S.ones[0].host, S.ones[0].id);
-      else say('More than one Downstage One is here. Choose one above, or type a Companion address.');
-    }, 1500);
+    p.hidden = false;
+    p.style.top = Math.min(r.bottom + 8, innerHeight - p.offsetHeight - 8) + 'px';
+    p.style.left = Math.max(8, Math.min(r.right - p.offsetWidth, innerWidth - p.offsetWidth - 8)) + 'px';
+    $('conn').classList.add('open');
+  }
+  function closeConn() { $('connPop').hidden = true; $('conn').classList.remove('open'); }
+  $('conn').onclick = () => { if ($('connPop').hidden) openConn(); else closeConn(); };
+  $('connList').onclick = e => {
+    const b = e.target.closest('button[data-pick]'), o = b && candidates().find(x => x.id === b.dataset.pick);
+    if (!o) return;
+    closeConn();
+    useHost(o.host, o.id);
   };
-  $('found').onchange = () => {
-    const v = $('found').value, o = S.ones.find(x => x.id === v);
-    S.typing = v === 'other';
-    if (o) useHost(o.host, o.id); else paintFound();
-    if (S.typing) { $('host').focus(); $('host').select(); }
-  };
+  document.addEventListener('pointerdown', e => { if (!$('connPop').hidden && e.target.closest && !e.target.closest('#connPop, #conn')) closeConn(); }, true);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeConn(); });
+  $('more').onclick = () => { const r = $('more').getBoundingClientRect(); openMenu(r.left, r.bottom + 6, null); };
 
   // ── updates: only inside the Mac app (macapp/updater.swift). A check at launch stays quiet unless there's
   // something new, because a venue network with no internet isn't news. Nothing installs until it's pressed ──
@@ -919,7 +1002,6 @@
     $('surfaces').href = 'http://' + S.host + ':8000/surfaces';
     $('removeDeck').style.display = S.decks.length > 1 ? 'inline-block' : 'none';
     $('addDeck').style.display = S.decks.length < 8 ? '' : 'none';
-    document.title = 'Virtual Deck: ' + spec(d).name;
   }
   $('model').onchange = () => { const d = S.sel; changeDeck(d, () => { d.model = $('model').value; paintHeader(); }); };
   const gridChange = () => {
@@ -933,9 +1015,11 @@
   $('addDeck').onclick = addDeck;
   $('removeDeck').onclick = () => removeDeck(S.sel);
   $('arrange').onclick = () => { for (const d of S.decks) d.pos = {}; saveDecks(); layout(); };
+  // a typed address beats anything found
   $('host').onchange = () => {
-    const v = $('host').value.trim().replace(/^https?:\/\//, '').replace(/[:/].*$/, '');
+    const v = cleanHost($('host').value);
     if (!v) { $('host').value = S.host; return; }
+    closeConn();
     useHost(v, '');
   };
   // Locked, decks can't be moved or resized
@@ -957,10 +1041,10 @@
   // On a narrow window the buttons from each group line up in one row of their own, and go home when it widens
   const narrow = matchMedia('(max-width: 560px)'), trayed = matchMedia('(max-width: 560px), (max-height: 500px)');
   function placeTools() {
-    const tools = $('tools'), rule = document.querySelector('#connGrp .rule');
+    const tools = $('tools');
     tools.hidden = !narrow.matches;
-    if (narrow.matches) tools.append($('addDeck'), $('removeDeck'), $('arrange'), $('surfaces'));
-    else { document.querySelector('#deckGrp').append($('addDeck'), $('removeDeck'), $('arrange')); rule.before($('surfaces')); }
+    if (narrow.matches) tools.append($('addDeck'), $('removeDeck'), $('arrange'));
+    else document.querySelector('#deckGrp').append($('addDeck'), $('removeDeck'), $('arrange'));
   }
   narrow.addEventListener('change', placeTools);
   placeTools();
@@ -986,14 +1070,14 @@
     if (!trayed.matches || document.body.classList.contains('trayshut')) return;
     trayTimer = setTimeout(() => {
       const a = document.activeElement, busy = a && a.closest('header') && a.matches('input, select');
-      if (busy || $('sheet').classList.contains('on') || $('ctx').classList.contains('on')) armTray();
+      if (busy || $('sheet').classList.contains('on') || $('ctx').classList.contains('on') || !$('connPop').hidden) armTray();
       else setTray(false);
     }, 10000);
   }
   trayed.addEventListener('change', armTray);
   document.addEventListener('pointerdown', e => {
     if (!e.target.closest) return;
-    if (e.target.closest('header, #ctx, #sheet')) armTray();
+    if (e.target.closest('header, #ctx, #sheet, #connPop')) armTray();
     else if (trayed.matches) setTray(false);
   });
   document.querySelector('header').addEventListener('change', e => { if (e.target.matches('select')) e.target.blur(); armTray(); });
@@ -1016,12 +1100,12 @@
   paintFound();
   paintShows();
   connect();
-  // no One and nothing typed: a Companion on this Mac is the next best guess, and a One found later still wins.
-  // Not on an iPhone or iPad, which can't run Companion
-  if (NATIVE && !S.host && !window.downstageMobile) setTimeout(() => {
-    if (S.host) return;
-    S.guess = true; S.host = '127.0.0.1'; $('host').value = S.host; paintHeader(); connect();
-  }, 4000);
+  // Nothing typed: look on this Mac straight away (an iPhone or iPad can't run Companion), and give the network a few
+  // seconds before asking for an address. A plain browser with nothing to look with asks at once
+  if (!S.host) {
+    if (NATIVE && !window.downstageMobile) probeMac();
+    setTimeout(() => { paintConn(); askAddress(); }, NATIVE ? 6000 : 400);
+  }
 </script>
 </body>
 </html>
