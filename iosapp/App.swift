@@ -6,21 +6,31 @@ import SafariServices
 import UIKit
 import WebKit
 
-func makeShell() -> ShellController { DeckController() }
+func makeShell() -> ShellController { registerFonts(); return DeckController() }
+
+// Rajdhani for names, from the same file the page uses. Before any view is made, so none of them caches the fallback
+func registerFonts() {
+    guard UIFont(name: "Rajdhani-Bold", size: 12) == nil else { return }
+    let url = Bundle.main.resourceURL!.appendingPathComponent("web/fonts/rajdhani-700.woff2")
+    CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+}
 
 let rajdhani: (CGFloat) -> UIFont = { size in
     UIFont(name: "Rajdhani-Bold", size: size) ?? .systemFont(ofSize: size, weight: .bold)
 }
 
-// The bar at the foot, upright: who the deck is joined to and which deck, the lock, and "..." for everything else.
-// Sideways it hides, so the keys have the screen, and a tap beside the deck brings it back for a few seconds
+// The bar at the foot, upright: who the deck is joined to, which deck or its Companion page with arrows, the lock, and
+// "..." for everything else. Sideways it hides, so the keys have the screen, and a tap beside the deck brings it back
 final class DeckBar: UIView {
     let dot = UIView()
     let who = UIButton(type: .custom)
     let name = UILabel()
     let deck = UILabel()
+    let prevPage = UIButton(type: .system), nextPage = UIButton(type: .system), page = UILabel()
+    let pages = UIStackView()
     let lock = UIButton(type: .system)
     let more = UIButton(type: .system)
+    static let nameFont = UIFontMetrics(forTextStyle: .headline).scaledFont(for: rajdhani(19))
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -29,16 +39,24 @@ final class DeckBar: UIView {
         layer.cornerCurve = .continuous
         layer.borderWidth = 1
         layer.borderColor = UIColor(red: 0x23 / 255.0, green: 0x2A / 255.0, blue: 0x32 / 255.0, alpha: 1).cgColor
+        maximumContentSizeCategory = .accessibilityMedium      // Dynamic Type up to the first accessibility size
         dot.layer.cornerRadius = 4
         dot.translatesAutoresizingMaskIntoConstraints = false
-        name.font = rajdhani(19)
+        name.adjustsFontForContentSizeCategory = true
         name.textColor = UIColor(red: 0xE8 / 255.0, green: 0xEC / 255.0, blue: 0xEF / 255.0, alpha: 1)
         name.setContentHuggingPriority(.required, for: .horizontal)
         name.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
-        deck.font = .preferredFont(forTextStyle: .footnote)
-        deck.adjustsFontForContentSizeCategory = true
-        deck.textColor = UIColor(red: 0xA3 / 255.0, green: 0xAD / 255.0, blue: 0xB6 / 255.0, alpha: 1)
-        deck.lineBreakMode = .byTruncatingTail
+        for l in [deck, page] {
+            l.font = .preferredFont(forTextStyle: .footnote)
+            l.adjustsFontForContentSizeCategory = true
+            l.textColor = UIColor(red: 0xA3 / 255.0, green: 0xAD / 255.0, blue: 0xB6 / 255.0, alpha: 1)
+            l.lineBreakMode = .byTruncatingTail
+        }
+        page.font = UIFontMetrics(forTextStyle: .footnote).scaledFont(for: .monospacedDigitSystemFont(ofSize: 13, weight: .semibold))
+        page.textColor = UIColor(red: 0xE8 / 255.0, green: 0xEC / 255.0, blue: 0xEF / 255.0, alpha: 1)
+        page.isAccessibilityElement = false
+        page.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        name.setContentCompressionResistancePriority(.defaultHigh + 1, for: .horizontal)
         let text = UIStackView(arrangedSubviews: [name, deck])
         text.spacing = 8
         text.alignment = .firstBaseline
@@ -50,35 +68,54 @@ final class DeckBar: UIView {
         left.translatesAutoresizingMaskIntoConstraints = false
         who.addSubview(left)
         who.isAccessibilityElement = true
+        // the selected deck's Companion page: arrows with a full 44 pt target each, the number between them
+        for (b, symbol, label) in [(prevPage, "chevron.left", "Previous page"), (nextPage, "chevron.right", "Next page")] {
+            b.setImage(UIImage(systemName: symbol, withConfiguration: UIImage.SymbolConfiguration(textStyle: .footnote, scale: .medium)), for: .normal)
+            b.tintColor = UIColor(red: 0xE8 / 255.0, green: 0xEC / 255.0, blue: 0xEF / 255.0, alpha: 1)
+            b.accessibilityLabel = label
+            b.widthAnchor.constraint(equalToConstant: 44).isActive = true
+        }
+        pages.addArrangedSubview(prevPage); pages.addArrangedSubview(page); pages.addArrangedSubview(nextPage)
+        pages.alignment = .center
+        pages.isHidden = true
         for (b, symbol, label) in [(lock, "lock.open", "Lock layout"), (more, "ellipsis", "More")] {
             b.setImage(UIImage(systemName: symbol, withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .medium)), for: .normal)
             b.tintColor = UIColor(red: 0xA3 / 255.0, green: 0xAD / 255.0, blue: 0xB6 / 255.0, alpha: 1)
             b.accessibilityLabel = label
         }
-        let row = UIStackView(arrangedSubviews: [who, lock, more])
+        let row = UIStackView(arrangedSubviews: [who, pages, lock, more])
         row.spacing = 2
         row.alignment = .fill
         row.translatesAutoresizingMaskIntoConstraints = false
         addSubview(row)
+        who.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        pages.setContentHuggingPriority(.required, for: .horizontal)
         NSLayoutConstraint.activate([
             row.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18), row.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
-            row.topAnchor.constraint(equalTo: topAnchor), row.bottomAnchor.constraint(equalTo: bottomAnchor),
+            row.topAnchor.constraint(equalTo: topAnchor, constant: 4), row.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4),
             left.leadingAnchor.constraint(equalTo: who.leadingAnchor), left.trailingAnchor.constraint(lessThanOrEqualTo: who.trailingAnchor),
-            left.centerYAnchor.constraint(equalTo: who.centerYAnchor),
+            left.centerYAnchor.constraint(equalTo: who.centerYAnchor), left.topAnchor.constraint(greaterThanOrEqualTo: who.topAnchor),
             dot.widthAnchor.constraint(equalToConstant: 8), dot.heightAnchor.constraint(equalToConstant: 8),
             lock.widthAnchor.constraint(equalToConstant: 44), more.widthAnchor.constraint(equalToConstant: 44),
         ])
-        show(live: false, word: "Finding Companion…", name: "", deck: "", locked: false)
+        show(live: false, word: "Finding Companion…", name: "", deck: "", page: "", locked: false)
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    func show(live: Bool, word: String, name n: String, deck d: String, locked: Bool) {
+    // page: what the selected deck's page reads, like "Page 2" or "Deck 2 · Page 2", or empty when no page is known
+    func show(live: Bool, word: String, name n: String, deck d: String, page p: String, locked: Bool) {
         dot.backgroundColor = live ? UIColor(red: 0x2F / 255.0, green: 0xD9 / 255.0, blue: 0x7B / 255.0, alpha: 1)
                                    : UIColor(red: 0xF7 / 255.0, green: 0xC0 / 255.0, blue: 0x66 / 255.0, alpha: 1)
         // joined: the Companion's name, in Rajdhani. Not yet: what it's doing, in the system face
         name.text = live ? n : word
-        name.font = live ? rajdhani(19) : .preferredFont(forTextStyle: .subheadline)
+        name.font = live ? Self.nameFont : .preferredFont(forTextStyle: .subheadline)
         deck.text = d
+        deck.isHidden = !p.isEmpty
+        // at the large text sizes the number alone sits between the arrows; VoiceOver still hears the whole line
+        let big = traitCollection.preferredContentSizeCategory.isAccessibilityCategory
+        page.text = big ? (p.components(separatedBy: "Page ").last ?? p) : p
+        pages.isHidden = p.isEmpty
+        prevPage.accessibilityValue = p; nextPage.accessibilityValue = p
         who.accessibilityLabel = (live ? "Joined to \(n)" : word) + (d.isEmpty ? "" : ", \(d)")
         who.accessibilityHint = "Companion and deck settings"
         lock.setImage(UIImage(systemName: locked ? "lock.fill" : "lock.open", withConfiguration: UIImage.SymbolConfiguration(pointSize: 17, weight: .medium)), for: .normal)
@@ -88,9 +125,65 @@ final class DeckBar: UIView {
     }
 }
 
+// The first time a Companion turns up: one card and one tap, because joining adds a surface to a real Companion.
+// After that the deck joins it again by itself. Two of a kind found: it asks which
+final class JoinCard: UIView {
+    let picture = UIImageView(), title = UILabel(), detail = UILabel()
+    let join = UIButton(type: .system), other = UIButton(type: .system)
+    var id = ""
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = panel
+        layer.cornerRadius = 24; layer.cornerCurve = .continuous; layer.borderWidth = 1; layer.borderColor = edge.cgColor
+        maximumContentSizeCategory = .accessibilityMedium
+        picture.contentMode = .scaleAspectFit
+        picture.tintColor = secondaryInk
+        picture.heightAnchor.constraint(equalToConstant: 64).isActive = true
+        picture.isAccessibilityElement = false
+        title.font = UIFontMetrics(forTextStyle: .title2).scaledFont(for: rajdhani(28)); title.adjustsFontForContentSizeCategory = true
+        title.textColor = ink; title.textAlignment = .center
+        detail.font = .preferredFont(forTextStyle: .subheadline); detail.adjustsFontForContentSizeCategory = true
+        detail.textColor = secondaryInk; detail.textAlignment = .center; detail.numberOfLines = 0
+        var j = UIButton.Configuration.filled()
+        j.baseBackgroundColor = runGreen; j.baseForegroundColor = rgb(0x06140C); j.cornerStyle = .large
+        j.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { var a = $0; a.font = UIFontMetrics(forTextStyle: .headline).scaledFont(for: .systemFont(ofSize: 17, weight: .semibold)); return a }
+        join.configuration = j
+        join.heightAnchor.constraint(greaterThanOrEqualToConstant: 50).isActive = true
+        other.tintColor = runGreen
+        other.titleLabel?.font = .preferredFont(forTextStyle: .body); other.titleLabel?.adjustsFontForContentSizeCategory = true
+        other.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+        let stack = UIStackView(arrangedSubviews: [picture, title, detail, join, other])
+        stack.axis = .vertical; stack.spacing = 8; stack.alignment = .fill
+        stack.setCustomSpacing(4, after: title); stack.setCustomSpacing(16, after: detail)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+        NSLayoutConstraint.activate([stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 20), stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -20),
+                                     stack.topAnchor.constraint(equalTo: topAnchor, constant: 22), stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12)])
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    func offer(_ m: [String: Any]) {
+        id = m["id"] as? String ?? ""
+        let choose = m["choose"] as? Bool ?? false, one = (m["kind"] as? String) == "one"
+        picture.image = one ? UIImage(named: "One") : UIImage(systemName: "square.grid.3x3.square", withConfiguration: UIImage.SymbolConfiguration(pointSize: 48, weight: .light))
+        if choose {
+            title.text = "\(m["count"] as? Int ?? 2) \(one ? "Downstage Ones" : "Companions") found"
+            detail.text = "Choose which one this deck joins."
+            join.setTitle("Choose", for: .normal); other.setTitle("Not now", for: .normal)
+        } else {
+            title.text = m["name"] as? String
+            detail.text = (one ? "Downstage One" : "Companion") + " found on this network"
+            join.setTitle("Join", for: .normal); other.setTitle("Use another Companion", for: .normal)
+        }
+        join.accessibilityHint = choose ? nil : "Adds this deck to \(m["name"] as? String ?? "Companion") as a surface"
+    }
+}
+
 final class DeckController: ShellController {
     let finder = OneFinder()
     var ones = "[]"
+    var companions = "[]"
+    let card = JoinCard()
+    var declined: Set<String> = []              // offers turned down this time, so the card doesn't come straight back
     let tap = UIImpactFeedbackGenerator(style: .light)
     let bar = DeckBar()
     var upright = true
@@ -102,6 +195,7 @@ final class DeckController: ShellController {
     var answering: ((String) -> Void)?          // the open alert's answer, for a test script
     var gridTimer: Timer?
     var ranTest = false
+    var barShown: CGFloat = 0
 
     func feel() { if Prefs.feel { tap.impactOccurred() } }
     // a command for the page, the same ones the Mac's menus send
@@ -131,7 +225,6 @@ final class DeckController: ShellController {
                                      injectionTime: .atDocumentEnd, forMainFrameOnly: true))
     }
     override func viewDidLoad() {
-        registerFonts()
         super.viewDidLoad()
         UIApplication.shared.isIdleTimerDisabled = Prefs.awake   // a deck that sleeps isn't a deck, unless it was asked to
         bar.translatesAutoresizingMaskIntoConstraints = false
@@ -139,8 +232,37 @@ final class DeckController: ShellController {
         let g = view.safeAreaLayoutGuide
         NSLayoutConstraint.activate([
             bar.leadingAnchor.constraint(equalTo: g.leadingAnchor, constant: 12), bar.trailingAnchor.constraint(equalTo: g.trailingAnchor, constant: -12),
-            bar.bottomAnchor.constraint(equalTo: g.bottomAnchor, constant: -Self.barGap), bar.heightAnchor.constraint(equalToConstant: Self.barHeight),
+            bar.bottomAnchor.constraint(equalTo: g.bottomAnchor, constant: -Self.barGap), bar.heightAnchor.constraint(greaterThanOrEqualToConstant: Self.barHeight),
         ])
+        card.translatesAutoresizingMaskIntoConstraints = false
+        card.isHidden = true
+        view.addSubview(card)
+        let wide = card.widthAnchor.constraint(equalTo: g.widthAnchor, constant: -24); wide.priority = .defaultHigh
+        NSLayoutConstraint.activate([
+            card.centerXAnchor.constraint(equalTo: g.centerXAnchor), wide, card.widthAnchor.constraint(lessThanOrEqualToConstant: 460),
+            card.bottomAnchor.constraint(equalTo: g.bottomAnchor, constant: -Self.barGap),
+        ])
+        card.join.addAction(UIAction { [weak self] _ in
+            guard let self = self else { return }
+            self.feel()
+            if self.card.id.isEmpty { self.hideCard(); self.openSheet(.companion) } else { self.cmd("pick", self.card.id); self.hideCard() }
+        }, for: .touchUpInside)
+        card.other.addAction(UIAction { [weak self] _ in
+            guard let self = self else { return }
+            let choosing = self.card.id.isEmpty
+            self.declined.insert(choosing ? "choose" : self.card.id)
+            self.hideCard()
+            if !choosing { self.openSheet(.companion) }
+        }, for: .touchUpInside)
+        // the selected deck's page, from the bar. Sideways, a press keeps the bar up for another five seconds
+        for (b, up) in [(bar.prevPage, "0"), (bar.nextPage, "1")] {
+            b.addAction(UIAction { [weak self] _ in
+                guard let self = self else { return }
+                self.feel()
+                self.cmd("page", "\(self.st["deckNo"] as? Int ?? 1):\(up)")
+                if !self.upright { self.peekBar() }
+            }, for: .touchUpInside)
+        }
         bar.who.addAction(UIAction { [weak self] _ in self?.feel(); self?.openSheet(.companion) }, for: .touchUpInside)
         bar.lock.addAction(UIAction { [weak self] _ in self?.feel(); self?.cmd("lock") }, for: .touchUpInside)
         bar.more.addAction(UIAction { [weak self] _ in self?.feel(); self?.openSheet(nil) }, for: .touchUpInside)
@@ -149,25 +271,44 @@ final class DeckController: ShellController {
             self.ones = String(decoding: json, as: UTF8.self)
             self.pageReady()
         }
+        // the same finding as the Mac: Companion on the network, then a One. A test can switch it off and hand the page made-up finds
+        finder.findCompanions = true
+        #if DEBUG
+        if ProcessInfo.processInfo.environment["DOWNSTAGE_TEST_NOFIND"] != nil { return }
+        #endif
+        finder.companionsChanged = { [weak self] list in
+            guard let self = self, let json = try? JSONSerialization.data(withJSONObject: list) else { return }
+            self.companions = String(decoding: json, as: UTF8.self)
+            self.pageReady()
+        }
         finder.start()
     }
-    // Rajdhani for names, from the same file the page uses
-    func registerFonts() {
-        guard UIFont(name: "Rajdhani-Bold", size: 12) == nil else { return }
-        let url = Bundle.main.resourceURL!.appendingPathComponent("web/fonts/rajdhani-700.woff2")
-        CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+    func showCard(_ m: [String: Any]) {
+        let id = m["id"] as? String ?? ""
+        guard !declined.contains(m["choose"] as? Bool == true ? "choose" : id), card.isHidden || card.id != id else { return }
+        card.offer(m)
+        card.isHidden = false
+        card.alpha = 0
+        UIView.animate(withDuration: 0.2) { self.card.alpha = 1; self.bar.alpha = 0 }
+        bar.isUserInteractionEnabled = false
+        UIAccessibility.post(notification: .screenChanged, argument: card.title)
+    }
+    func hideCard() {
+        guard !card.isHidden else { return }
+        UIView.animate(withDuration: 0.2, animations: { self.card.alpha = 0 }) { _ in self.card.isHidden = true }
+        placeBar()
     }
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         let up = view.bounds.height >= view.bounds.width
-        if up != upright { upright = up; placeBar() }
+        if up != upright || bar.bounds.height != barShown { upright = up; barShown = bar.bounds.height; placeBar() }
     }
     override func viewSafeAreaInsetsDidChange() { super.viewSafeAreaInsetsDidChange(); placeBar() }
     // upright the bar is always there and the decks sit above it; sideways it's away and the decks take the room
     func placeBar() {
         barTimer?.invalidate()
-        setBar(visible: upright, animated: false)
-        call("document.documentElement.style.setProperty('--bar', '\(upright ? Self.barHeight + Self.barGap : 0)px')")
+        setBar(visible: upright && card.isHidden, animated: false)
+        call("document.documentElement.style.setProperty('--bar', '\(upright ? max(Self.barHeight, bar.bounds.height) + Self.barGap : 0)px')")
     }
     func setBar(visible: Bool, animated: Bool) {
         let change = { self.bar.alpha = visible ? 1 : 0 }
@@ -175,7 +316,7 @@ final class DeckController: ShellController {
         if animated { UIView.animate(withDuration: 0.18, animations: change) } else { change() }
     }
     func peekBar() {
-        guard !upright else { return }
+        guard !upright, card.isHidden else { return }
         setBar(visible: true, animated: true)
         barTimer?.invalidate()
         barTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: false) { [weak self] _ in
@@ -184,7 +325,7 @@ final class DeckController: ShellController {
         }
     }
     override func pageReady() {
-        placeBar(); call("window.onesFound && window.onesFound(\(ones))")
+        placeBar(); call("window.onesFound && window.onesFound(\(ones)); window.companionsFound && window.companionsFound(\(companions))")
         #if DEBUG
         runTestSteps()
         #endif
@@ -216,9 +357,14 @@ final class DeckController: ShellController {
         case "deckmenu": deckMenu(["n": Int(p.count > 1 ? p[1] : "1") ?? 1, "x": 100.0, "y": 300.0])
         case "dismiss": top.dismiss(animated: true)
         case "host": cmd("host", p.count > 1 ? p[1] : "")
+        case "join": card.join.sendActions(for: .touchUpInside)
+        case "other": card.other.sendActions(for: .touchUpInside)
+        case "barnext": bar.nextPage.sendActions(for: .touchUpInside)
+        case "barprev": bar.prevPage.sendActions(for: .touchUpInside)
+        case "js": call(String(step.dropFirst(3)))
         default: break
         }
-        call("window.webkit.messageHandlers.testlog && window.webkit.messageHandlers.testlog.postMessage(JSON.stringify({ step: \(String(reflecting: step)), now: shows.now, shows: showNames(), decks: S.decks.map(d => d.model), sel: S.decks.indexOf(S.sel) + 1, locked: !!S.locked, host: S.host, live: S.state === 'ok', say: document.getElementById('say').textContent }))")
+        call("window.webkit.messageHandlers.testlog && window.webkit.messageHandlers.testlog.postMessage(JSON.stringify({ step: \(String(reflecting: step)), now: shows.now, shows: showNames(), decks: S.decks.map(d => d.model), page: S.decks.map(d => d.page || ''), joined: JSON.parse(localStorage.getItem('ds_vdeck_joined') || '[]'), card: \(card.isHidden ? "''" : String(reflecting: card.title.text ?? "")), bar: \(String(reflecting: bar.page.isHidden ? (bar.deck.text ?? "") : (bar.page.text ?? ""))), keys: [...document.querySelectorAll('.deckgrid .key')].slice(0, 3).map(k => k.getAttribute('aria-label') + (k.querySelector('img') ? '+img' : '')), sel: S.decks.indexOf(S.sel) + 1, locked: !!S.locked, host: S.host, live: S.state === 'ok', say: document.getElementById('say').textContent }))")
     }
     #endif
     // iOS stops the socket while the app is away and Companion drops the surface, so join again straight away
@@ -235,11 +381,17 @@ final class DeckController: ShellController {
                 // one deck: its full name. Several: the short name and which one, so it fits beside the Companion's name
                 let full = m["deck"] as? String ?? ""
                 let deck = decks > 1 ? "Deck \(no) · " + full.replacingOccurrences(of: "Stream Deck ", with: "") : full
-                bar.show(live: m["live"] as? Bool ?? false, word: m["word"] as? String ?? "", name: m["name"] as? String ?? "", deck: deck, locked: m["locked"] as? Bool ?? false)
+                // a known Companion page puts the arrows in the bar, in place of the deck's type (that's in the sheet)
+                let list = m["decks"] as? [[String: Any]] ?? [], p = no >= 1 && no <= list.count ? list[no - 1]["page"] as? String ?? "" : ""
+                let page = p.isEmpty ? "" : (decks > 1 ? "Deck \(no) · Page \(p)" : "Page \(p)")
+                let live = m["live"] as? Bool ?? false
+                bar.show(live: live, word: m["word"] as? String ?? "", name: m["name"] as? String ?? "", deck: deck, page: page, locked: m["locked"] as? Bool ?? false)
+                if live { hideCard() }
             case "edge": peekBar()
             case "ask": ask(m)
             case "askClose": if let a = asking, a.id == m["id"] as? Int { asking = nil; a.alert.presentingViewController?.dismiss(animated: true) }
             case "deckmenu": deckMenu(m)
+            case "offer": showCard(m)
             default: break
             }
         }
@@ -265,7 +417,7 @@ final class Pill: UILabel {
     override func drawText(in rect: CGRect) { super.drawText(in: rect.insetBy(dx: 9, dy: 3)) }
     func set(_ text: String, _ kind: String) {
         self.text = text
-        font = .systemFont(ofSize: 13, weight: .semibold)
+        font = UIFontMetrics(forTextStyle: .footnote).scaledFont(for: .systemFont(ofSize: 13, weight: .semibold))
         layer.cornerRadius = 11; layer.masksToBounds = true
         let tint: (UInt32, UInt32) = kind == "live" ? (0x10301D, 0x74E8A8) : kind == "warn" ? (0x33270F, 0xF7C066) : (0x181D23, 0x7C8791)
         backgroundColor = rgb(tint.0); textColor = rgb(tint.1)
@@ -282,6 +434,7 @@ extension DeckController {
         let home = SheetHome(owner: self)
         let nav = UINavigationController(rootViewController: home)
         nav.navigationBar.tintColor = runGreen
+        nav.view.maximumContentSizeCategory = .accessibilityMedium     // Dynamic Type up to the first accessibility size
         nav.view.tintColor = runGreen
         if UIDevice.current.userInterfaceIdiom == .pad { nav.modalPresentationStyle = .formSheet }
         else if let p = nav.sheetPresentationController {
@@ -435,25 +588,40 @@ final class SheetHome: SheetList {
         case .snap: return toggle("Snap decks into line", on: st["snap"] as? Bool ?? true) { [weak self] _ in self?.owner.cmd("snap") }
         case .show:
             let c = cell(st["title"] as? String ?? "Untitled show", st["docState"] as? String, chevron: true)
-            if var conf = c.contentConfiguration as? UIListContentConfiguration { conf.textProperties.font = rajdhani(19); c.contentConfiguration = conf }
+            if var conf = c.contentConfiguration as? UIListContentConfiguration { conf.textProperties.font = UIFontMetrics(forTextStyle: .body).scaledFont(for: rajdhani(19)); c.contentConfiguration = conf }
             return c
         case .lock: return toggle("Lock layout", on: st["locked"] as? Bool ?? false) { [weak self] _ in self?.owner.cmd("lock") }
         case .feel: return toggle("Feel each press", on: Prefs.feel) { on in Prefs.feel = on }
         case .awake: return toggle("Keep the screen awake", on: Prefs.awake) { on in Prefs.awake = on; UIApplication.shared.isIdleTimerDisabled = on }
         }
     }
+    // "Companion", then its status pill and name at the right; at the large text sizes they stack under it instead
     func companionCell() -> UITableViewCell {
-        let c = cell("Companion", chevron: true)
+        let c = UITableViewCell(style: .default, reuseIdentifier: nil)
+        c.backgroundColor = panel
+        c.accessoryType = .disclosureIndicator
         let live = st["live"] as? Bool ?? false, host = st["host"] as? String ?? "", word = st["word"] as? String ?? ""
+        let title = UILabel(); title.text = "Companion"; title.textColor = ink
+        title.font = .preferredFont(forTextStyle: .body); title.adjustsFontForContentSizeCategory = true
+        title.setContentHuggingPriority(.required, for: .horizontal); title.setContentCompressionResistancePriority(.required, for: .horizontal)
         let pill = Pill()
         pill.set(live ? "Joined" : host.isEmpty ? (word.hasPrefix("Choose") ? "Choose" : "Not set") : word.hasPrefix("Joining") ? "Joining" : "Not answering",
                  live ? "live" : host.isEmpty ? "quiet" : "warn")
-        let name = UILabel(); name.text = host.isEmpty ? "" : st["name"] as? String; name.textColor = secondaryInk; name.font = .preferredFont(forTextStyle: .body)
+        pill.setContentCompressionResistancePriority(.required, for: .horizontal)
+        let name = UILabel(); name.text = host.isEmpty ? "" : st["name"] as? String; name.textColor = secondaryInk
+        name.font = .preferredFont(forTextStyle: .body); name.adjustsFontForContentSizeCategory = true; name.lineBreakMode = .byTruncatingMiddle
         let right = UIStackView(arrangedSubviews: [pill, name]); right.spacing = 8; right.alignment = .center
-        right.translatesAutoresizingMaskIntoConstraints = false
-        c.contentView.addSubview(right)
-        NSLayoutConstraint.activate([right.trailingAnchor.constraint(equalTo: c.contentView.trailingAnchor, constant: -4), right.centerYAnchor.constraint(equalTo: c.contentView.centerYAnchor)])
-        c.accessibilityLabel = "Companion, " + (pill.text ?? "") + (name.text.map { ", " + $0 } ?? "")
+        let big = traitCollection.preferredContentSizeCategory.isAccessibilityCategory
+        let row = UIStackView(arrangedSubviews: big ? [title, right] : [title, UIView(), right])
+        row.axis = big ? .vertical : .horizontal; row.spacing = 8; row.alignment = big ? .leading : .center
+        row.translatesAutoresizingMaskIntoConstraints = false
+        c.contentView.addSubview(row)
+        let m = c.contentView.layoutMarginsGuide
+        NSLayoutConstraint.activate([row.leadingAnchor.constraint(equalTo: m.leadingAnchor), row.trailingAnchor.constraint(equalTo: m.trailingAnchor),
+                                     row.topAnchor.constraint(equalTo: m.topAnchor), row.bottomAnchor.constraint(equalTo: m.bottomAnchor)])
+        c.isAccessibilityElement = true
+        c.accessibilityLabel = "Companion, " + (pill.text ?? "") + ((name.text ?? "").isEmpty ? "" : ", " + (name.text ?? ""))
+        c.accessibilityTraits = .button
         return c
     }
     override func tableView(_ t: UITableView, didSelectRowAt i: IndexPath) {
@@ -621,7 +789,7 @@ final class ShowsScreen: SheetList {
         if i.section == 0 {
             guard !names.isEmpty else { let c = cell("No saved shows yet"); c.selectionStyle = .none; return c }
             let c = checked(cell(names[i.row]), names[i.row] == now)
-            if var conf = c.contentConfiguration as? UIListContentConfiguration { conf.textProperties.font = rajdhani(19); c.contentConfiguration = conf }
+            if var conf = c.contentConfiguration as? UIListContentConfiguration { conf.textProperties.font = UIFontMetrics(forTextStyle: .body).scaledFont(for: rajdhani(19)); c.contentConfiguration = conf }
             return c
         }
         let a = actions[i.row]

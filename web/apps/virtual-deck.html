@@ -349,7 +349,7 @@
 
   // ── drawing ──
   function build(d) {
-    const s = spec(d), cell = n => '<div class="key" data-k="' + n + '"></div>';
+    const s = spec(d), cell = n => '<div class="key" data-k="' + n + '" role="button" aria-label="Key ' + (n + 1) + '"></div>';
     if (!d.el) {
       d.el = document.createElement('div');
       d.el.className = 'chassis';
@@ -375,6 +375,7 @@
     d.el.style.setProperty('--cols', s.cols);
     d.angle = {};
     layout();
+    if (chromeBar && !Object.keys(d.imgs).length) { try { d.imgs = JSON.parse(store.get(keysKey(d), '{}')) || {}; } catch (e) {} }
     for (const [k, src] of Object.entries(d.imgs)) paint(d, +k, src);
   }
   function stageBox() {
@@ -455,11 +456,13 @@
     for (const d of S.decks) {
       if (!d.el || d.pageAsk) continue;
       const label = d.el.querySelector('.pg');
-      if (!d.ok) { label.textContent = ''; d.page = ''; continue; }
+      if (!d.ok) { label.textContent = ''; if (d.page) { d.page = ''; tellApp(); } continue; }
       d.pageAsk = true;
       readPage(d).then(page => {
           d.pageAsk = false;
+          const was = d.page;
           d.page = d.ok && /^\d+$/.test(page) ? page : '';
+          if (d.page !== was) tellApp();
           if (!d.page) { label.textContent = ''; return; }
           if (!label.firstChild) label.innerHTML = PAGE_BOX;
           label.querySelector('b').textContent = d.page;
@@ -502,8 +505,17 @@
     setTimeout(() => { if ($('say').textContent === hint) say(''); }, 8000);
   }
   // the old image stays up until the new one is decoded: swapping it sooner blanks the key for a frame on every update
+  // the saved keys belong to one Companion, one deck and one layout
+  const keysKey = d => 'keys:' + [S.host, deviceId(d), d.model, d.cols, d.rows].join('|');
+  function keepKeys(d) {
+    if (!chromeBar || !S.host) return;
+    clearTimeout(d.keepT);
+    d.keepT = setTimeout(() => store.set(keysKey(d), JSON.stringify(d.imgs)), 1500);
+  }
   function paint(d, n, src) {
     d.imgs[n] = src;
+    if (d.fresh) d.fresh.add(n);
+    keepKeys(d);
     const el = d.el && d.el.querySelector('.deckgrid [data-k="' + n + '"]');
     if (!el) return;
     if (!src) { const old = el.querySelector('img'); if (old) old.remove(); return; }
@@ -537,7 +549,7 @@
   function addDevice(d) {
     const s = spec(d), keys = s.cols * totalRows(s), mark = d.n > 1 ? ', deck ' + d.n : '';
     send('ADD-DEVICE DEVICEID="' + deviceId(d) + '" PRODUCT_NAME="Downstage Virtual Deck ' + s.name.replace(/^Stream Deck /, '') + mark + '" CAN_CHANGE_PAGE="Allow page arrows" KEYS_TOTAL=' + keys +
-         ' KEYS_PER_ROW=' + s.cols + ' BITMAPS=' + (keys > 48 ? 96 : 160) + ' BITMAP_FORMAT="png" COLORS="hex" TEXT=0 BRIGHTNESS=0');
+         ' KEYS_PER_ROW=' + s.cols + ' BITMAPS=' + (keys > 48 ? 96 : 160) + ' BITMAP_FORMAT="png" COLORS="hex" TEXT=' + (chromeBar ? 1 : 0) + ' BRIGHTNESS=0');
   }
   function connect() {
     clearTimeout(S.retry);
@@ -579,7 +591,21 @@
       if (a.BITMAP !== undefined) paint(d, n, a.BITMAP ? image(a.BITMAP) : '');
       const el = d.el && d.el.querySelector('.deckgrid [data-k="' + n + '"]');
       if (el) el.classList.toggle('down', a.PRESSED === '1' || a.PRESSED === 'true');
+      // the key's text, for VoiceOver (asked for in the phone app only)
+      if (el && a.TEXT !== undefined) {
+        let t = '';
+        try { t = decodeURIComponent(escape(atob(a.TEXT))).replace(/\s+/g, ' ').trim(); } catch (e) {}
+        el.setAttribute('aria-label', t || 'Key ' + (n + 1));
+      }
     } else if (cmd === 'KEYS-CLEAR') {
+      // in the phone app a clear right as the deck rejoins waits a moment: the keys that come back replace their old
+      // pictures, and only the ones that don't are cleared, so the deck never flashes blank
+      if (chromeBar && Object.keys(d.imgs).length) {
+        d.fresh = new Set();
+        clearTimeout(d.clearT);
+        d.clearT = setTimeout(() => { for (const k of Object.keys(d.imgs)) if (!d.fresh.has(+k)) paint(d, +k, ''); d.fresh = null; }, 1500);
+        return;
+      }
       d.imgs = {};
       if (d.el) for (const el of d.el.querySelectorAll('.deckgrid [data-k]')) el.innerHTML = el.classList.contains('dial') ? '<i></i>' : '';
     } else if (cmd === 'PING') send('PONG ' + rest);
@@ -1006,7 +1032,10 @@
     }
   };
 
+  const joinedIds = () => { try { return JSON.parse(store.get('joined', '[]')) || []; } catch (e) { return []; } };
+  function noteJoined(key) { const j = joinedIds(); if (!j.includes(key)) { j.push(key); store.set('joined', JSON.stringify(j)); } }
   function useHost(host, id) {
+    if (chromeBar) noteJoined(id || 'host:' + host);
     S.choose = false;
     S.oneId = id;
     store.set('one', id);
@@ -1031,12 +1060,20 @@
     if (S.host) return;
     const c = candidates();
     if (S.oneId && !c.some(o => o.id === S.oneId) && Date.now() - S.t0 < 6000) { S.pick = setTimeout(autoPick, 1000); return; }
+    const use = o => {
+      if (!chromeBar || joinedIds().includes(o.id)) return useHost(o.host, o.id);
+      chromeBar.postMessage({ action: 'offer', id: o.id, name: o.name, host: o.host, kind: o.kind });
+    };
     const mac = c.find(o => o.kind === 'mac');
-    if (mac) return useHost(mac.host, mac.id);
+    if (mac) return use(mac);
     for (const kind of ['companion', 'one']) {
       const k = c.filter(o => o.kind === kind);
-      if (k.length === 1) return useHost(k[0].host, k[0].id);
-      if (k.length > 1) { S.choose = true; paintConn(); return; }
+      if (k.length === 1) return use(k[0]);
+      if (k.length > 1) {
+        S.choose = true; paintConn();
+        if (chromeBar) chromeBar.postMessage({ action: 'offer', choose: true, count: k.length, kind });
+        return;
+      }
     }
   }
   function found() {
@@ -1058,7 +1095,7 @@
   }
   // Asked only when nothing turned up. A Companion found while it's open answers it instead
   function askAddress() {
-    if (S.host || S.asked || candidates().length || S.sheet) return;
+    if (S.host || S.asked || candidates().length || S.sheet || (chromeBar && joinedIds().length)) return;
     S.asked = true;
     askSheet({ title: 'Where is Companion?', text: 'Nothing turned up on this network. Type the address of the computer running Companion, like 192.168.1.20.',
                name: '', placeholder: 'Companion address', go: 'Connect', address: true, done: v => { const h = cleanHost(v); if (h) useHost(h, ''); } });

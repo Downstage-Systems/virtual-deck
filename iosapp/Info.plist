@@ -14,7 +14,7 @@
 <key>UIApplicationSceneManifest</key><dict><key>UIApplicationSupportsMultipleScenes</key><false/></dict>
 <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
 <key>UISupportedInterfaceOrientations~ipad</key><array><string>UIInterfaceOrientationPortrait</string><string>UIInterfaceOrientationPortraitUpsideDown</string><string>UIInterfaceOrientationLandscapeLeft</string><string>UIInterfaceOrientationLandscapeRight</string></array>
-<key>NSLocalNetworkUsageDescription</key><string>Virtual Deck joins Bitfocus Companion on your network as a Stream Deck surface, and finds Downstage Ones.</string>
-<key>NSBonjourServices</key><array><string>_downstage._tcp</string></array>
+<key>NSLocalNetworkUsageDescription</key><string>Virtual Deck finds Bitfocus Companion and Downstage Ones on your network, and joins Companion as a Stream Deck surface.</string>
+<key>NSBonjourServices</key><array><string>_downstage._tcp</string><string>_companion-satellite-ws._tcp</string></array>
 <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/><key>NSAllowsArbitraryLoadsInWebContent</key><true/></dict>
 </dict></plist>
