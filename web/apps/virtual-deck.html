@@ -58,6 +58,12 @@
   body.inapp header { padding-left: 80px; }
   body.inapp.macfs header { padding-left: 14px; }
   body.inapp #more, body.inapp header h1, body.inapp header h1 + .rule { display: none !important; }
+  /* inside the iPhone and iPad app the app draws a bar and a sheet around the decks: no toolbar or tray here, and the decks
+     sit clear of the camera cut-out, the home bar and the app's bar (--bar, set by the app; 0 sideways) */
+  html body.chrome header, html body.chrome #tray, html body.chrome #upd { display: none !important; }
+  html body.chrome::before { display: none !important; }
+  body.chrome #stage { padding: calc(var(--sa-t, 0px) + 10px) calc(var(--sa-r, 0px) + 10px) calc(var(--sa-b, 0px) + var(--bar, 0px) + 10px) calc(var(--sa-l, 0px) + 10px) !important; }
+  body.chrome #say { position: absolute; top: calc(var(--sa-t, 0px) + 4px); left: 12px; right: 12px; z-index: 49999; padding: 8px 12px; border-radius: 12px; background: var(--panel); }
   /* the connection settings, under the chip */
   #connPop { position: fixed; z-index: 100000; width: min(290px, calc(100vw - 16px)); display: flex; flex-direction: column; gap: 10px; padding: 12px;
              background: #1C2229; border: 1px solid var(--ctl); border-radius: 8px; box-shadow: 0 14px 34px rgba(0,0,0,.5); }
@@ -269,6 +275,10 @@
   const appMenu = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.menu || null;
   const MENUBAR = !!appMenu;
   document.body.classList.toggle('inapp', MENUBAR);
+  // inside the iPhone and iPad app: the app's own bar and sheet carry everything but the decks
+  const chromeBar = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.chrome || null;
+  document.body.classList.toggle('chrome', !!chromeBar);
+  const MOBILE = window.downstageMobile || '';      // "iPhone" or "iPad", set by the app
   const clamp = (v, lo, hi, d) => { const n = parseInt(v, 10); return isNaN(n) ? d : Math.min(hi, Math.max(lo, n)); };
 
   // Which Companion: ?host= first, then the unit serving this page, then a typed address, then what the app finds by
@@ -411,6 +421,17 @@
       const x0 = stacked ? 0 : i * (w + slot), y0 = stacked ? i * (h + slot) : 0;
       place(d, x0 + (w - d.el.offsetWidth) / 2, y0 + (h - d.el.offsetHeight) / 2, b);
     });
+    // in the phone app, upright: the decks nobody moved stack up from the bottom of the screen, in thumb reach
+    if (chromeBar && stacked) {
+      let y = b.H;
+      for (let i = S.decks.length - 1; i >= 0; i--) {
+        const d = S.decks[i];
+        if (!d.el || d.pos[key]) continue;
+        y -= d.el.offsetHeight;
+        place(d, (b.W - d.el.offsetWidth) / 2, y, b);
+        y -= slot;
+      }
+    }
     $('arrange').style.display = S.decks.some(d => d.pos[key]) ? 'inline-block' : 'none';
     tellApp();
   }
@@ -612,6 +633,7 @@
     closeMenu();
     if (e.button || e.ctrlKey) return;      // a right click opens the menu, it never presses a key
     const d0 = deckAt(e.target);
+    if (chromeBar && !d0 && e.target.closest('#stage')) chromeBar.postMessage({ action: 'edge' });
     if (e.pointerType === 'touch') startHold(e, d0);
     if (d0 && d0 !== S.sel) select(d0);
     // the deck's frame moves it, straight away. The keys and the gaps between them never do
@@ -871,6 +893,7 @@
     rows.push(item('snap', ICON.snap, 'Snapping', { on: S.snap }));
     rows.push(item('lock', S.locked ? ICON.locked : ICON.unlocked, 'Lock layout', { on: S.locked }));
     rows.push('<hr>');
+    if (chromeBar) rows.push(item('conn', ICON.surfaces, 'Companion…'));
     if (S.host) rows.push(item('surfaces', ICON.surfaces, 'Open Surfaces in Companion'));
     const m = $('ctx');
     m.innerHTML = rows.join('');
@@ -907,6 +930,7 @@
     else if (a === 'lock') toggleLock();
     else if (a === 'pageNext' || a === 'pagePrev') changePage(d, a === 'pageNext');
     else if (a === 'surfaces') $('surfaces').click();
+    else if (a === 'conn') openConn();
   });
 
   // ── finding a One: the Mac app browses Bonjour and calls this with what's on the network ──
@@ -917,10 +941,17 @@
   // A timer, not a frame: a minimized or covered window gets no frames, and its menus still have to be right
   let tellQueued = false;
   function tellApp() {
-    if (!appMenu || tellQueued) return;
+    if ((!appMenu && !chromeBar) || tellQueued) return;
     tellQueued = true;
     setTimeout(() => {
       tellQueued = false;
+      if (chromeBar) {
+        const live = !!S.host && S.state === 'ok';
+        chromeBar.postMessage({ action: 'state', live, word: $('connWord').textContent, name: S.host ? connName() : '', host: S.host,
+                                deck: S.sel ? spec(S.sel).name : '', decks: S.decks.length, deckNo: S.sel ? S.decks.indexOf(S.sel) + 1 : 1,
+                                locked: !!S.locked, title: shows.now || 'Untitled show', edited: !!$('docState').textContent });
+        return;
+      }
       const h = document.querySelector('header'), rects = [];
       for (const el of h.querySelectorAll('button, select, input, a')) { const r = el.getBoundingClientRect(); if (r.width && r.height) rects.push([r.left, r.top, r.width, r.height]); }
       appMenu.postMessage({ action: 'dragzone', height: h.offsetHeight, rects });
@@ -944,7 +975,14 @@
     else if (cmd === 'snap') toggleSnap();
     else if (cmd === 'conn') openConn();
     else if (cmd === 'surfaces' && S.host) $('surfaces').click();
+    else if (cmd === 'more') {   // until the app has its sheet: the page's own menu, just above the app's bar
+      openMenu(innerWidth, 0, null);
+      const m = $('ctx');
+      m.style.top = Math.max(4, innerHeight - barSpace() - m.offsetHeight - 8) + 'px';
+    }
   };
+  // what the app's bar and the home bar take from the bottom of the page
+  const barSpace = () => { const cs = getComputedStyle(document.documentElement); return (parseFloat(cs.getPropertyValue('--bar')) || 0) + (parseFloat(cs.getPropertyValue('--sa-b')) || 0); };
   function useHost(host, id) {
     S.choose = false;
     S.oneId = id;
@@ -1007,7 +1045,7 @@
   // ── the connection chip and its settings ──
   function connName() {
     const o = candidates().find(x => x.id === S.oneId && x.host === S.host);
-    return o ? o.name : S.host === '127.0.0.1' ? 'This Mac' : S.host;
+    return o ? o.name : S.host === '127.0.0.1' && !MOBILE ? 'This Mac' : S.host;
   }
   function paintConn() {
     const live = !!S.host && S.state === 'ok', name = S.host ? connName() : '';
@@ -1016,7 +1054,7 @@
       const looking = NATIVE && Date.now() - S.t0 < 6000;
       word = S.choose ? 'Choose Companion' : looking ? 'Finding Companion…' : 'Add Companion';
       text = S.choose ? 'More than one is on this network. Choose where this deck connects.' : looking ? 'Looking on this network…' : 'Choose where Companion is, or type its address.';
-    } else if (live) { word = name; text = 'Connected to Companion ' + (S.host === '127.0.0.1' ? 'on this Mac.' : name !== S.host ? 'on ' + name + ' (' + S.host + ').' : 'at ' + S.host + '.'); }
+    } else if (live) { word = name; text = 'Connected to Companion ' + (S.host === '127.0.0.1' && !MOBILE ? 'on this Mac.' : name !== S.host ? 'on ' + name + ' (' + S.host + ').' : 'at ' + S.host + '.'); }
     else if (S.state === 'off') { word = 'Companion not answering'; text = S.note || 'Not connected to ' + S.host + '.'; }
     else { word = 'Joining Companion…'; text = 'Joining Companion at ' + S.host + '…'; }
     $('connWord').textContent = word;
@@ -1035,8 +1073,11 @@
     const p = $('connPop'), r = $('conn').getBoundingClientRect();
     paintFound();
     p.hidden = false;
-    p.style.top = Math.min(r.bottom + 8, innerHeight - p.offsetHeight - 8) + 'px';
-    p.style.left = Math.max(8, Math.min(r.right - p.offsetWidth, innerWidth - p.offsetWidth - 8)) + 'px';
+    if (chromeBar) { p.style.top = Math.max(8, innerHeight - barSpace() - p.offsetHeight - 8) + 'px'; p.style.left = Math.max(8, (innerWidth - p.offsetWidth) / 2) + 'px'; }
+    else {
+      p.style.top = Math.min(r.bottom + 8, innerHeight - p.offsetHeight - 8) + 'px';
+      p.style.left = Math.max(8, Math.min(r.right - p.offsetWidth, innerWidth - p.offsetWidth - 8)) + 'px';
+    }
     $('conn').classList.add('open');
   }
   function closeConn() { $('connPop').hidden = true; $('conn').classList.remove('open'); }
@@ -1137,6 +1178,7 @@
   narrow.addEventListener('change', placeTools);
   placeTools();
   function setTray(open) {
+    if (chromeBar) return;      // the phone app has its own bar, so there's no tray to open or shut
     const h = document.querySelector('header'), body = document.body;
     if (open === !body.classList.contains('trayshut')) return;
     store.set('tray', open ? '1' : '0');
@@ -1155,6 +1197,7 @@
   let trayTimer = 0;
   function armTray() {
     clearTimeout(trayTimer);
+    if (chromeBar) return;
     if (!trayed.matches || document.body.classList.contains('trayshut')) return;
     trayTimer = setTimeout(() => {
       const a = document.activeElement, busy = a && a.closest('header') && a.matches('input, select');
