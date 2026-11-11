@@ -2,3 +2,4 @@ dist/
 *.app/
 .DS_Store
 macapp/dmg/venv/
+app-backups/
