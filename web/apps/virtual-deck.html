@@ -33,6 +33,7 @@
   button, a.btn { border-radius: 6px; font-weight: 500; white-space: nowrap; cursor: default; }
   button:hover, a.btn:hover { border-color: #46515D; }
   input.num { width: 56px; }
+  #model { max-width: 200px; }
   .sp { flex: 1 1 0; min-width: 0; }
   /* the show's name, with Edited or Not saved yet beside it. Inside the Mac app the window title carries it */
   .doc { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
@@ -244,16 +245,21 @@
 
 <script>
   // Stream Deck models as Companion lays them out (Companion repo NOTES.md, "Deck grid maps"):
-  // rows of keys, then for models with dials a touch strip row and a dial row.
+  // rows of keys, then for models with dials a touch strip row and a dial row. Named and ordered as the One lists them
+  // (downstage-os docs/one-system-ui.md), largest first. A saved show keeps the id, so a name can change but an id never does
   const MODELS = {
-    mini:   { name: 'Stream Deck Mini', cols: 3, rows: 2 },
-    neo:    { name: 'Stream Deck Neo', cols: 4, rows: 2 },
-    mk2:    { name: 'Stream Deck 15 key', cols: 5, rows: 3 },
-    xl:     { name: 'Stream Deck XL', cols: 8, rows: 4 },
-    plus:   { name: 'Stream Deck +', cols: 4, rows: 2, dials: [0, 1, 2, 3] },
-    plusxl: { name: 'Stream Deck + XL', cols: 9, rows: 4, dials: [0, 2, 3, 5, 6, 8] },
+    xl:     { name: 'Stream Deck XL 8 x 4', cols: 8, rows: 4 },
+    plusxl: { name: 'Stream Deck + XL 9 x 4', cols: 9, rows: 4, dials: [0, 2, 3, 5, 6, 8] },
+    mk2:    { name: 'Stream Deck MK.2 5 x 3', cols: 5, rows: 3 },
+    plus:   { name: 'Stream Deck + 4 x 2', cols: 4, rows: 2, dials: [0, 1, 2, 3] },
+    neo:    { name: 'Stream Deck Neo 4 x 2', cols: 4, rows: 2 },
+    mini:   { name: 'Stream Deck Mini 3 x 2', cols: 3, rows: 2 },
+    g8x8:   { name: '8 x 8', cols: 8, rows: 8 },
     custom: { name: 'Custom grid' },
   };
+  // the + and + XL share their key grids with the Neo and the XL, so the deck menu says what else they have. The toolbar's
+  // pull-down has no room for it at the app's own size, and the + in the name already tells them apart there
+  const modelLabel = m => m.name + (m.dials ? ' with dials' : '');
   const $ = id => document.getElementById(id);
   const store = {
     get(k, d) { try { const v = localStorage.getItem('ds_vdeck_' + k); return v === null ? d : v; } catch (e) { return d; } },
@@ -279,7 +285,26 @@
   };
   const model0 = MODELS[params.get('deck')] ? params.get('deck') : (MODELS[store.get('model', '')] ? store.get('model') : 'mk2');
   function newDeck(n, model, cols, rows, pos) { return { n, model, cols, rows, pos: pos || {}, imgs: {}, angle: {}, ok: false, el: null }; }
-  try { S.decks = JSON.parse(store.get('decks', '[]')).filter(d => MODELS[d.model]).map(d => newDeck(d.n, d.model, clamp(d.cols, 1, 32, 8), clamp(d.rows, 1, 16, 4), d.pos)); } catch (e) {}
+  // Saved decks back into live ones. A model this version doesn't know (a newer app's, or a damaged save) becomes a custom
+  // grid of the size it saved, or is left out if it saved none, and the rest of the show still opens
+  function knownDecks(list) {
+    const out = [];
+    let lost = 0;
+    for (const d of Array.isArray(list) ? list : []) {
+      if (!d || typeof d !== 'object') { lost++; continue; }
+      let model = d.model;
+      if (!MODELS[model]) { if (d.cols > 0 && d.rows > 0) model = 'custom'; else { lost++; continue; } }
+      const n = Number.isInteger(d.n) && d.n > 0 && !out.some(x => x.n === d.n) ? d.n : Math.max(0, ...out.map(x => x.n)) + 1;
+      out.push(newDeck(n, model, clamp(d.cols, 1, 32, 8), clamp(d.rows, 1, 16, 4), JSON.parse(JSON.stringify(d.pos || {}))));
+    }
+    if (lost) {
+      const line = (lost === 1 ? 'One deck was' : lost + ' decks were') + ' left out: this version doesn\u2019t know what kind ' + (lost === 1 ? 'it is.' : 'they are.');
+      S.keepSay = line;     // joining Companion clears the line, but not this one
+      setTimeout(() => { say(line); setTimeout(() => { if ($('say').textContent === line) say(''); S.keepSay = ''; }, 8000); }, 0);
+    }
+    return out;
+  }
+  try { S.decks = knownDecks(JSON.parse(store.get('decks', '[]'))); } catch (e) {}
   if (!S.decks.length) S.decks = [newDeck(1, model0, clamp(store.get('cols', 8), 1, 32, 8), clamp(store.get('rows', 4), 1, 16, 4))];
   else if (MODELS[params.get('deck')]) S.decks[0].model = params.get('deck');
   S.sel = S.decks[0];
@@ -481,7 +506,7 @@
   // ── Companion's Satellite API ──
   function send(line) { try { if (S.ws && S.ws.readyState === 1) S.ws.send(line + '\n'); } catch (e) {} }
   function addDevice(d) {
-    const s = spec(d), keys = s.cols * totalRows(s), mark = d.n > 1 ? ' ' + d.n : '';
+    const s = spec(d), keys = s.cols * totalRows(s), mark = d.n > 1 ? ', deck ' + d.n : '';
     send('ADD-DEVICE DEVICEID="' + deviceId(d) + '" PRODUCT_NAME="Downstage Virtual Deck ' + s.name.replace(/^Stream Deck /, '') + mark + '" CAN_CHANGE_PAGE="Allow page arrows" KEYS_TOTAL=' + keys +
          ' KEYS_PER_ROW=' + s.cols + ' BITMAPS=' + (keys > 48 ? 96 : 160) + ' BITMAP_FORMAT="png" COLORS="hex" TEXT=0 BRIGHTNESS=0');
   }
@@ -517,7 +542,7 @@
   function line(l) {
     const [cmd, a, rest] = parse(l), d = S.decks.find(x => deviceId(x) === a.DEVICEID) || S.decks[0];
     if (cmd === 'ADD-DEVICE') {
-      if (/^OK/.test(rest)) { d.ok = true; dot(allOk() ? 'ok' : ''); if (allOk()) say(''); }
+      if (/^OK/.test(rest)) { d.ok = true; dot(allOk() ? 'ok' : ''); if (allOk() && $('say').textContent !== S.keepSay) say(''); }
       else if (/^ERROR/.test(rest)) { d.ok = false; S.note = 'Companion refused this deck: ' + (a.MESSAGE || rest); dot('off'); say(S.note); }
     } else if (cmd === 'KEY-STATE') {
       const n = +a.KEY;
@@ -772,7 +797,8 @@
   // Every surface leaves Companion and the show's decks join; a deck's id comes from its number, so Companion still knows its page
   function applyLayout(list) {
     for (const d of S.decks) { if (d.ok) send('REMOVE-DEVICE DEVICEID="' + deviceId(d) + '"'); if (d.el) d.el.remove(); }
-    S.decks = list.map(d => newDeck(d.n, d.model, d.cols, d.rows, JSON.parse(JSON.stringify(d.pos || {}))));
+    S.decks = knownDecks(list);
+    if (!S.decks.length) S.decks = [newDeck(1, model0, 8, 4)];
     store.set('decks', JSON.stringify(layoutNow()));
     S.decks.forEach(build);
     select(S.decks[0]);
@@ -828,7 +854,7 @@
     const rows = [];
     if (d) {
       rows.push('<div class="ctxh">Deck ' + (S.decks.indexOf(d) + 1) + '</div>');
-      for (const [k, m] of Object.entries(MODELS)) rows.push(item('model', deckIcon(k), m.name, { v: k, on: d.model === k }));
+      for (const [k, m] of Object.entries(MODELS)) rows.push(item('model', deckIcon(k), modelLabel(m), { v: k, on: d.model === k }));
       rows.push('<hr>');
       if (d.page) rows.push('<div class="ctxh">Page ' + d.page + '</div>', item('pageNext', ICON.next, 'Next page'), item('pagePrev', ICON.prev, 'Previous page'), '<hr>');
     }
@@ -1049,7 +1075,7 @@
   }
 
   // ── the header ──
-  $('model').innerHTML = Object.entries(MODELS).map(([k, m]) => '<option value="' + k + '">' + m.name + '</option>').join('');
+  $('model').innerHTML = Object.entries(MODELS).map(([k, m]) => '<option value="' + k + '" title="' + esc(modelLabel(m)) + '">' + esc(m.name) + '</option>').join('');
   $('host').value = S.host;
   function paintHeader() {
     const d = S.sel;
